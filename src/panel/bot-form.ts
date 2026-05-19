@@ -111,9 +111,11 @@ export function instancesTableHtml(bots: BotConfig[]) {
     return `<div class="empty">Nenhuma instância ainda. <a href="/instances/new" style="color:var(--primary)">Criar primeira instância</a></div>`;
   }
 
-  return `<table class="table">
+  return `<div class="table-scroll" role="region" aria-label="Lista de instâncias">
+    <table class="table table-instances">
     <thead><tr>
-      <th>Bot</th><th>Status</th><th>Leads</th><th>Prévias</th><th>Entregas</th><th></th>
+      <th>Bot</th><th>Status</th><th>Leads</th><th>Prévias</th><th>Entregas</th>
+      <th class="th-actions">Ações</th>
     </tr></thead>
     <tbody>
     ${bots
@@ -138,16 +140,19 @@ export function instancesTableHtml(bots: BotConfig[]) {
         <td><span class="metric">—</span></td>
         <td><span class="metric">${bot.previewMediaUrls.length}</span></td>
         <td><span class="metric">${bot.deliveryMediaUrls.length}</span></td>
-        <td>
+        <td class="td-actions">
           <div class="row-actions">
-            <a href="/instances/${bot.id}/edit" class="btn btn-secondary" style="padding:6px 10px;font-size:0.72rem" title="Editar">${icons.edit} Editar</a>
+            <a href="/instances/${bot.id}/edit" class="action-btn" title="Editar configuração">
+              <span class="action-btn__icon">${icons.edit}</span>
+              <span class="action-btn__label">Editar</span>
+            </a>
             <form method="post" action="/bots/${bot.id}/toggle">
-              <button type="submit" class="btn btn-secondary" style="padding:6px 10px;font-size:0.72rem">
-                ${bot.active ? "Pausar" : "Ativar"}
+              <button type="submit" class="action-btn action-btn--ghost" title="${bot.active ? "Pausar bot" : "Ativar bot"}">
+                <span class="action-btn__label">${bot.active ? "Pausar" : "Ativar"}</span>
               </button>
             </form>
             <form method="post" action="/bots/${bot.id}/delete" onsubmit="return confirm('Remover esta instância?')">
-              <button type="submit" class="btn-icon danger" title="Remover">${icons.trash}</button>
+              <button type="submit" class="action-btn action-btn--danger" title="Remover">${icons.trash}</button>
             </form>
           </div>
         </td>
@@ -155,5 +160,6 @@ export function instancesTableHtml(bots: BotConfig[]) {
       )
       .join("")}
     </tbody>
-  </table>`;
+    </table>
+  </div>`;
 }

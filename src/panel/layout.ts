@@ -48,6 +48,7 @@ export function appLayout(
   <style>${globalStyles}</style>
 </head>
 <body>
+  <div class="ambient" aria-hidden="true"></div>
   <div class="app">
     <aside class="sidebar">
       <div class="sidebar-brand"><div class="logo">BM</div> BotManager</div>

@@ -138,7 +138,7 @@ export function loginPage(message = "") {
     </div>
   </div>
 </body>
-</html>`.replaceAll("<div", "<div").replaceAll("</div>", "</div>");
+</html>`;
 }
 
 export function dashboardPage(
@@ -191,15 +191,15 @@ export function dashboardPage(
     </div>
 
     <div class="grid-2">
-      <div class="card">
+      <div class="card card--table">
         <div class="card-head">
           <h3>Suas Instâncias</h3>
           <form method="post" action="/restart" style="display:inline">
-            <button type="submit" class="btn btn-secondary" style="padding:8px 14px;font-size:0.8rem">${icons.refresh} Reiniciar</button>
+            <button type="submit" class="btn btn-secondary btn-sm">${icons.refresh} Reiniciar</button>
           </form>
         </div>
-        <div class="card-body" style="padding:0">${instancesTableHtml(bots)}</div>
-        <div style="padding:12px 20px;border-top:1px solid var(--border)">
+        <div class="card-body card-body--flush">${instancesTableHtml(bots)}</div>
+        <div class="card-foot">
           <a href="/instances" class="card-link">Ver todas as instâncias →</a>
         </div>
       </div>
@@ -245,11 +245,11 @@ export function instancesPage(
 ) {
   const body = `
     ${message ? alertHtml(message, isError ? "error" : "success") : ""}
-    <div class="card" style="margin-bottom:16px">
+    <div class="card card--table" style="margin-bottom:16px">
       <div class="card-head"><h3>Todas as Instâncias (${bots.length})</h3>
-        <a href="/instances/new" class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem">${icons.plus} Nova</a>
+        <a href="/instances/new" class="btn btn-primary btn-sm">${icons.plus} Nova</a>
       </div>
-      <div class="card-body" style="padding:0">${instancesTableHtml(bots)}</div>
+      <div class="card-body card-body--flush">${instancesTableHtml(bots)}</div>
     </div>`;
 
   return appLayout("Instâncias", "instances", body, partial, userName);
