@@ -767,7 +767,7 @@ export function settingsPage(input: {
             <li>Ninguém acessa bots, prompts ou chaves sem autenticar.</li>
             <li>A API Key fica criptografada no servidor após salvar.</li>
             <li>Você também pode definir <code>OPENAI_API_KEY</code> direto no Railway.</li>
-            <li><strong>Produção:</strong> adicione PostgreSQL no Railway e vincule <code>DATABASE_URL</code> — sem isso, dados somem a cada deploy.</li>
+            <li><strong>Produção:</strong> PostgreSQL no Railway com <code>DATABASE_URL</code> ou <code>DATABASE_PUBLIC_URL</code>.</li>
           </ul>
         </div>
       </div>

@@ -22,6 +22,7 @@ const envSchema = z.object({
   PREVIEW_MEDIA_URLS: z.string().default(""),
   DELIVERY_MEDIA_URLS: z.string().default(""),
   DATABASE_URL: z.string().default(""),
+  DATABASE_PUBLIC_URL: z.string().default(""),
   DATA_DIR: z.string().default("")
 });
 
@@ -29,8 +30,10 @@ function loadEnv() {
   const parsed = envSchema.safeParse(process.env);
   if (parsed.success) {
     const data = parsed.data;
+    const databaseUrl = data.DATABASE_URL || data.DATABASE_PUBLIC_URL;
     return {
       ...data,
+      DATABASE_URL: databaseUrl,
       SESSION_SECRET: data.SESSION_SECRET || `${data.PANEL_PASSWORD}-session-secret-v1`,
       DATA_DIR: data.DATA_DIR || path.join(rootDir, "data")
     };
