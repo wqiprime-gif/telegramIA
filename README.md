@@ -53,8 +53,14 @@ http://localhost:3000
 
 | Variavel | Exemplo |
 |----------|---------|
-| `OPENAI_API_KEY` | `sk-proj-...` |
 | `PANEL_PASSWORD` | `sua-senha-forte` |
+
+### Variaveis recomendadas
+
+| Variavel | Exemplo |
+|----------|---------|
+| `OPENAI_API_KEY` | `sk-proj-...` (ou configure no painel em Configuracoes) |
+| `SESSION_SECRET` | string longa aleatoria |
 
 ### Variaveis opcionais
 
