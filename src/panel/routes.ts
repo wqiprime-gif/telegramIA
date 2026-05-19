@@ -9,12 +9,15 @@ import { env } from "../config.js";
 import { useDatabase } from "../db/index.js";
 import {
   dashboardStats,
+  getLatestSale,
   listConversations,
   listLeads,
   listProducts,
   listReceipts,
+  listRecentActivity,
   listSales,
   salesByDay,
+  salesRankingByBot,
   saveProduct
 } from "../db/events.js";
 import { loadBots, saveBots, uploadsDir } from "../bots.js";
@@ -31,14 +34,18 @@ import {
   leadsPage,
   mediaPage,
   paymentsPage,
-  productsPage
+  productsPage,
+  salesChartSvgFromData
 } from "./pages.js";
 import {
+  activityFeedHtml,
   dashboardPage,
+  formatRelativeTime,
   instancesPage,
   loginPage,
   newInstancePage,
-  settingsPage
+  settingsPage,
+  topBotsRankingHtml
 } from "./ui.js";
 
 async function saveUploadedFile(file: AsyncIterable<Buffer>, originalName: string) {
@@ -122,13 +129,57 @@ export async function registerPanelRoutes(
       {
         stats: await dashboardStats(),
         chart: await salesByDay(7),
-        recentSales: await listSales(10)
+        activities: await listRecentActivity(8),
+        topBots: await salesRankingByBot(5)
       },
       query.msg,
       query.t === "err",
       partial
     );
     return reply.type("text/html").send(html);
+  });
+
+  app.get("/api/panel/live", async (request, reply) => {
+    if (!requireAuth(request, reply)) return;
+    const bots = await loadBots();
+    const stats = await dashboardStats();
+    const chart = await salesByDay(7);
+    const activities = await listRecentActivity(8);
+    const topBots = await salesRankingByBot(5);
+    const latestSale = await getLatestSale();
+    const recentSales = await listSales(8);
+
+    const bellSales = recentSales.map((row) => {
+      const s = row as Record<string, unknown>;
+      const product = String(s.product_name ?? s.productName ?? "Produto");
+      const cents = Number(s.amount_cents ?? s.amountCents ?? 0);
+      const botName = String(s.bot_name ?? "Bot");
+      const at = String(s.created_at ?? s.createdAt ?? new Date().toISOString());
+      const reais = (cents / 100).toFixed(2).replace(".", ",");
+      return {
+        title: "Venda confirmada",
+        subtitle: `${product} · R$ ${reais} · ${botName}`,
+        time: formatRelativeTime(at)
+      };
+    });
+
+    return reply.send({
+      stats: {
+        leads: stats.leads,
+        salesTotalCents: stats.salesTotalCents,
+        salesCount: stats.salesCount,
+        messagesToday: stats.messagesToday,
+        activeBots: bots.filter((b) => b.active).length
+      },
+      activityHtml: activityFeedHtml(activities),
+      topBotsHtml: topBotsRankingHtml(topBots),
+      chartSvg: salesChartSvgFromData(chart),
+      latestSale: latestSale
+        ? { id: latestSale.id, subtitle: latestSale.subtitle }
+        : null,
+      latestSaleAt: latestSale?.at ?? null,
+      bellSales
+    });
   });
 
   app.get("/leads", async (request, reply) => {
@@ -187,13 +238,15 @@ export async function registerPanelRoutes(
   app.get("/instances", async (request, reply) => {
     if (!requireAuth(request, reply)) return;
     const query = z.object({ msg: z.string().optional(), t: z.string().optional() }).parse(request.query);
-    return reply.type("text/html").send(instancesPage(await loadBots(), query.msg, query.t === "err"));
+    return reply
+      .type("text/html")
+      .send(instancesPage(await loadBots(), query.msg, query.t === "err", isPartial(request)));
   });
 
   app.get("/instances/new", async (request, reply) => {
     if (!requireAuth(request, reply)) return;
     const query = z.object({ msg: z.string().optional(), t: z.string().optional() }).parse(request.query);
-    return reply.type("text/html").send(newInstancePage(query.msg, query.t === "err"));
+    return reply.type("text/html").send(newInstancePage(query.msg, query.t === "err", isPartial(request)));
   });
 
   app.get("/settings", async (request, reply) => {
@@ -202,14 +255,17 @@ export async function registerPanelRoutes(
     const status = await getApiKeyStatus();
     const model = await getOpenAIModel();
     return reply.type("text/html").send(
-      settingsPage({
-        message: query.msg,
-        messageIsError: query.t === "err",
-        maskedKey: status.masked,
-        configured: status.configured,
-        source: status.source,
-        model
-      })
+      settingsPage(
+        {
+          message: query.msg,
+          messageIsError: query.t === "err",
+          maskedKey: status.masked,
+          configured: status.configured,
+          source: status.source,
+          model
+        },
+        isPartial(request)
+      )
     );
   });
 

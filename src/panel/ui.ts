@@ -1,4 +1,5 @@
 import type { BotConfig } from "../bots.js";
+import type { ActivityItem, BotSalesRank } from "../db/events.js";
 import { icons } from "./icons.js";
 import { alertHtml, appLayout, botHandle, botInitials, escapeHtml } from "./layout.js";
 import { salesChartSvgFromData } from "./pages.js";
@@ -12,8 +13,88 @@ export type DashboardData = {
     messagesToday: number;
   };
   chart: { day: string; totalCents: number }[];
-  recentSales: Record<string, unknown>[];
+  activities: ActivityItem[];
+  topBots: BotSalesRank[];
 };
+
+export function formatRelativeTime(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "agora";
+  if (mins < 60) return `${mins}min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  return `${Math.floor(hrs / 24)}d`;
+}
+
+function moneyBrl(cents: number) {
+  return `R$ ${(cents / 100).toFixed(2).replace(".", ",")}`;
+}
+
+export function activityFeedHtml(activities: ActivityItem[]) {
+  if (activities.length === 0) {
+    return `<div class="empty" style="padding:20px 8px;font-size:0.85rem">
+      Nenhuma atividade registrada ainda.<br/>
+      <small style="color:var(--muted)">Vendas, leads e pagamentos aparecem aqui automaticamente.</small>
+    </div>`;
+  }
+
+  const iconMap = {
+    sale: { cls: "sale", icon: icons.sparkles },
+    lead: { cls: "lead", icon: icons.users },
+    receipt: { cls: "pay", icon: icons.card }
+  } as const;
+
+  return activities
+    .map((item) => {
+      const meta = iconMap[item.type];
+      return `<div class="activity-item">
+      <div class="activity-icon ${meta.cls}">${meta.icon}</div>
+      <div class="activity-text"><strong>${escapeHtml(item.title)}</strong><br/>${escapeHtml(item.subtitle)}</div>
+      <div class="activity-time">${formatRelativeTime(item.at)}</div>
+    </div>`;
+    })
+    .join("");
+}
+
+export function topBotsRankingHtml(ranking: BotSalesRank[]) {
+  if (ranking.length === 0) {
+    return `<div class="empty" style="padding:20px 8px;font-size:0.85rem">
+      Nenhuma venda por instância ainda.<br/>
+      <small style="color:var(--muted)">O ranking aparece quando a primeira venda for confirmada.</small>
+    </div>`;
+  }
+
+  const maxTotal = Math.max(...ranking.map((r) => r.totalCents), 1);
+  const grandTotal = ranking.reduce((s, r) => s + r.totalCents, 0);
+
+  return ranking
+    .map((bot, i) => {
+      const pct = Math.round((bot.totalCents / maxTotal) * 100);
+      const share = grandTotal > 0 ? Math.round((bot.totalCents / grandTotal) * 100) : 0;
+      const rankCls = i === 0 ? "rank-gold" : i === 1 ? "rank-silver" : i === 2 ? "rank-bronze" : "";
+      return `<div class="rank-row">
+      <div class="rank-header">
+        <span class="product-rank ${rankCls}">${i + 1}</span>
+        <div class="rank-info">
+          <span class="rank-name">${escapeHtml(bot.name)}</span>
+          <span class="rank-meta">${bot.salesCount} venda(s) · ${share}% do faturamento</span>
+        </div>
+        <span class="product-price">${moneyBrl(bot.totalCents)}</span>
+      </div>
+      <div class="rank-bar"><span style="width:${pct}%"></span></div>
+    </div>`;
+    })
+    .join("");
+}
+
+function activityFeed(activities: ActivityItem[]) {
+  return activityFeedHtml(activities);
+}
+
+function topProducts(ranking: BotSalesRank[]) {
+  return topBotsRankingHtml(ranking);
+}
 
 function instancesTable(bots: BotConfig[]) {
   if (bots.length === 0) {
@@ -61,52 +142,6 @@ function instancesTable(bots: BotConfig[]) {
   </table>`;
 }
 
-function activityFeed(bots: BotConfig[]) {
-  const name = bots[0]?.name || "Seu bot";
-  return `
-    <div class="activity-item">
-      <div class="activity-icon pay">${icons.card}</div>
-      <div class="activity-text"><strong>Pagamento aprovado</strong><br/>Lead pagou via Pix · ${escapeHtml(name)}</div>
-      <div class="activity-time">agora</div>
-    </div>
-    <div class="activity-item">
-      <div class="activity-icon lead">${icons.users}</div>
-      <div class="activity-text"><strong>Novo lead</strong><br/>Conversa iniciada · ${escapeHtml(name)}</div>
-      <div class="activity-time">2min</div>
-    </div>
-    <div class="activity-item">
-      <div class="activity-icon sale">${icons.sparkles}</div>
-      <div class="activity-text"><strong>Bot ativo</strong><br/>Instância respondendo com IA</div>
-      <div class="activity-time">5min</div>
-    </div>`;
-}
-
-function topProducts(bots: BotConfig[]) {
-  const items =
-    bots.length > 0
-      ? bots.slice(0, 4).map((b, i) => ({
-          name: b.name,
-          price: `R$ ${(49.9 + i * 30).toFixed(2).replace(".", ",")}`
-        }))
-      : [
-          { name: "VIP Gold", price: "R$ 97,00" },
-          { name: "VIP Prata", price: "R$ 67,00" },
-          { name: "Pack Fotos", price: "R$ 39,90" }
-        ];
-
-  return items
-    .map(
-      (p, i) => `
-    <div class="product-row">
-      <div class="product-left">
-        <span class="product-rank">${i + 1}</span>
-        <span>${escapeHtml(p.name)}</span>
-      </div>
-      <span class="product-price">${p.price}</span>
-    </div>`
-    )
-    .join("");
-}
 
 export function loginPage(message = "") {
   return `<!doctype html>
@@ -172,16 +207,16 @@ export function dashboardPage(
         <div class="stat-icon green">${icons.users}</div>
         <div>
           <div class="stat-label">Leads</div>
-          <div class="stat-value">${data.stats.leads}</div>
-          <div class="stat-delta">${data.stats.messagesToday} msgs hoje</div>
+          <div class="stat-value" data-live-stat="leads">${data.stats.leads}</div>
+          <div class="stat-delta" data-live-stat="messagesToday">${data.stats.messagesToday} msgs hoje</div>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon blue">${icons.card}</div>
         <div>
           <div class="stat-label">Vendas</div>
-          <div class="stat-value">R$ ${salesReais}</div>
-          <div class="stat-delta">${data.stats.salesCount} venda(s)</div>
+          <div class="stat-value" data-live-stat="salesValue">R$ ${salesReais}</div>
+          <div class="stat-delta" data-live-stat="salesCount">${data.stats.salesCount} venda(s)</div>
         </div>
       </div>
       <div class="stat-card">
@@ -209,7 +244,7 @@ export function dashboardPage(
       </div>
       <div class="card">
         <div class="card-head"><h3>Atividades Recentes</h3></div>
-        <div class="card-body">${activityFeed(bots)}</div>
+        <div class="card-body" data-live="activity-feed">${activityFeed(data.activities)}</div>
       </div>
     </div>
 
@@ -229,18 +264,18 @@ export function dashboardPage(
       </div>
       <div class="card">
         <div class="card-head"><h3>Vendas — Últimos 7 dias</h3></div>
-        <div class="card-body chart-wrap">${salesChartSvgFromData(data.chart)}</div>
+        <div class="card-body chart-wrap" data-live="sales-chart">${salesChartSvgFromData(data.chart)}</div>
       </div>
       <div class="card">
         <div class="card-head"><h3>Top Instâncias</h3></div>
-        <div class="card-body">${topProducts(bots)}</div>
+        <div class="card-body" data-live="top-bots">${topProducts(data.topBots)}</div>
       </div>
     </div>`;
 
   return appLayout("Dashboard", "dashboard", body, partial);
 }
 
-export function instancesPage(bots: BotConfig[], message = "", isError = false) {
+export function instancesPage(bots: BotConfig[], message = "", isError = false, partial = false) {
   const body = `
     ${message ? alertHtml(message, isError ? "error" : "success") : ""}
     <div class="card" style="margin-bottom:16px">
@@ -250,10 +285,10 @@ export function instancesPage(bots: BotConfig[], message = "", isError = false) 
       <div class="card-body" style="padding:0">${instancesTable(bots)}</div>
     </div>`;
 
-  return appLayout("Instâncias", "instances", body.replaceAll("<div", "<div").replaceAll("</div>", "</div>"));
+  return appLayout("Instâncias", "instances", body, partial);
 }
 
-export function newInstancePage(message = "", isError = false) {
+export function newInstancePage(message = "", isError = false, partial = false) {
   const body = `
     ${message ? alertHtml(message, isError ? "error" : "success") : ""}
     <div class="card" style="max-width:900px">
@@ -316,17 +351,20 @@ export function newInstancePage(message = "", isError = false) {
       </div>
     </div>`;
 
-  return appLayout("Nova Instância", "new", body.replaceAll("<div", "<div").replaceAll("</div>", "</div>").replaceAll("<div", "<div").replaceAll("</div>", "</div>"));
+  return appLayout("Nova Instância", "new", body, partial);
 }
 
-export function settingsPage(input: {
-  message?: string;
-  messageIsError?: boolean;
-  maskedKey: string;
-  configured: boolean;
-  source: string;
-  model: string;
-}) {
+export function settingsPage(
+  input: {
+    message?: string;
+    messageIsError?: boolean;
+    maskedKey: string;
+    configured: boolean;
+    source: string;
+    model: string;
+  },
+  partial = false
+) {
   const statusClass = input.configured ? "badge-online" : "badge-paused";
   const statusText = input.configured ? `Conectado (${input.source})` : "Não configurado";
 
@@ -361,5 +399,5 @@ export function settingsPage(input: {
       </div>
     </div>`;
 
-  return appLayout("Configurações", "settings", body.replaceAll("<div", "<div").replaceAll("</div>", "</div>"));
+  return appLayout("Configurações", "settings", body, partial);
 }

@@ -363,6 +363,197 @@ export async function salesByDay(days = 7) {
   return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, totalCents]) => ({ day, totalCents }));
 }
 
+export type ActivityItem = {
+  id: string;
+  type: "sale" | "lead" | "receipt";
+  title: string;
+  subtitle: string;
+  at: string;
+};
+
+export type BotSalesRank = {
+  botId: string;
+  name: string;
+  salesCount: number;
+  totalCents: number;
+};
+
+function formatSaleSubtitle(productName: string, amountCents: number, botName: string) {
+  const reais = (amountCents / 100).toFixed(2).replace(".", ",");
+  return `${productName} · R$ ${reais} · ${botName || "Bot"}`;
+}
+
+export async function listRecentActivity(limit = 8): Promise<ActivityItem[]> {
+  const items: ActivityItem[] = [];
+
+  if (useDatabase()) {
+    const db = getPool();
+    const [sales, leads, receipts] = await Promise.all([
+      db.query<{
+        id: string;
+        amount_cents: number;
+        product_name: string;
+        created_at: string;
+        bot_name: string;
+      }>(
+        `SELECT s.id, s.amount_cents, s.product_name, s.created_at, COALESCE(b.name, 'Bot') AS bot_name
+         FROM sales s LEFT JOIN bots b ON b.id = s.bot_id
+         ORDER BY s.created_at DESC LIMIT $1`,
+        [limit]
+      ),
+      db.query<{
+        id: string;
+        display_name: string | null;
+        username: string | null;
+        last_message_at: string;
+        bot_name: string;
+      }>(
+        `SELECT l.id, l.display_name, l.username, l.last_message_at, COALESCE(b.name, 'Bot') AS bot_name
+         FROM leads l LEFT JOIN bots b ON b.id = l.bot_id
+         ORDER BY l.last_message_at DESC LIMIT $1`,
+        [limit]
+      ),
+      db.query<{ id: string; created_at: string; bot_name: string }>(
+        `SELECT r.id, r.created_at, COALESCE(b.name, 'Bot') AS bot_name
+         FROM receipts r LEFT JOIN bots b ON b.id = r.bot_id
+         WHERE r.paid = true ORDER BY r.created_at DESC LIMIT $1`,
+        [limit]
+      )
+    ]);
+
+    for (const s of sales.rows) {
+      items.push({
+        id: `sale-${s.id}`,
+        type: "sale",
+        title: "Venda confirmada",
+        subtitle: formatSaleSubtitle(s.product_name, s.amount_cents, s.bot_name),
+        at: new Date(s.created_at).toISOString()
+      });
+    }
+    for (const l of leads.rows) {
+      const who = l.display_name || (l.username ? `@${l.username}` : "Novo contato");
+      items.push({
+        id: `lead-${l.id}`,
+        type: "lead",
+        title: "Novo lead",
+        subtitle: `${who} · ${l.bot_name}`,
+        at: new Date(l.last_message_at).toISOString()
+      });
+    }
+    for (const r of receipts.rows) {
+      items.push({
+        id: `receipt-${r.id}`,
+        type: "receipt",
+        title: "Comprovante aprovado",
+        subtitle: `Pix validado · ${r.bot_name}`,
+        at: new Date(r.created_at).toISOString()
+      });
+    }
+  } else {
+    const store = await loadFileStore();
+    const bots = await (await import("../bots.js")).loadBots();
+    const botName = (id: string) => bots.find((b) => b.id === id)?.name ?? "Bot";
+
+    for (const s of store.sales.slice(0, limit)) {
+      items.push({
+        id: `sale-${s.id}`,
+        type: "sale",
+        title: "Venda confirmada",
+        subtitle: formatSaleSubtitle(s.productName, s.amountCents, botName(s.botId)),
+        at: s.createdAt
+      });
+    }
+    for (const l of [...store.leads].sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt)).slice(0, limit)) {
+      const who = l.displayName || (l.username ? `@${l.username}` : "Novo contato");
+      items.push({
+        id: `lead-${l.id}`,
+        type: "lead",
+        title: "Novo lead",
+        subtitle: `${who} · ${botName(l.botId)}`,
+        at: l.lastMessageAt
+      });
+    }
+    for (const r of store.receipts.filter((x) => x.paid).slice(0, limit)) {
+      items.push({
+        id: `receipt-${r.id}`,
+        type: "receipt",
+        title: "Comprovante aprovado",
+        subtitle: `Pix validado · ${botName(r.botId)}`,
+        at: r.createdAt
+      });
+    }
+  }
+
+  items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  return items.slice(0, limit);
+}
+
+export async function salesRankingByBot(limit = 5): Promise<BotSalesRank[]> {
+  if (useDatabase()) {
+    const { rows } = await getPool().query<{
+      bot_id: string;
+      name: string;
+      sales_count: number;
+      total_cents: number;
+    }>(
+      `SELECT b.id AS bot_id, b.name,
+              COUNT(s.id)::int AS sales_count,
+              COALESCE(SUM(s.amount_cents), 0)::int AS total_cents
+       FROM bots b
+       INNER JOIN sales s ON s.bot_id = b.id
+       GROUP BY b.id, b.name
+       ORDER BY total_cents DESC, sales_count DESC
+       LIMIT $1`,
+      [limit]
+    );
+    return rows.map((r) => ({
+      botId: r.bot_id,
+      name: r.name,
+      salesCount: r.sales_count,
+      totalCents: r.total_cents
+    }));
+  }
+
+  const store = await loadFileStore();
+  const bots = await (await import("../bots.js")).loadBots();
+  const map = new Map<string, BotSalesRank>();
+
+  for (const s of store.sales) {
+    const cur = map.get(s.botId) ?? {
+      botId: s.botId,
+      name: bots.find((b) => b.id === s.botId)?.name ?? "Bot",
+      salesCount: 0,
+      totalCents: 0
+    };
+    cur.salesCount += 1;
+    cur.totalCents += s.amountCents;
+    map.set(s.botId, cur);
+  }
+
+  return [...map.values()]
+    .sort((a, b) => b.totalCents - a.totalCents || b.salesCount - a.salesCount)
+    .slice(0, limit);
+}
+
+export async function getLatestSale() {
+  const sales = await listSales(1);
+  if (sales.length === 0) return null;
+  const s = sales[0] as Record<string, unknown>;
+  const id = String(s.id);
+  const amountCents = Number(s.amount_cents ?? s.amountCents ?? 0);
+  const productName = String(s.product_name ?? s.productName ?? "Produto");
+  const botName = String(s.bot_name ?? "Bot");
+  const at = String(s.created_at ?? s.createdAt ?? new Date().toISOString());
+  return {
+    id,
+    amountCents,
+    productName,
+    botName,
+    subtitle: formatSaleSubtitle(productName, amountCents, botName),
+    at
+  };
+}
+
 export async function dashboardStats() {
   if (useDatabase()) {
     const db = getPool();

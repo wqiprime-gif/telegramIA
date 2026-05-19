@@ -1,5 +1,6 @@
 import { globalStyles } from "./styles.js";
 import { icons } from "./icons.js";
+import { panelClientScript } from "./panel-client.js";
 
 export type NavId =
   | "dashboard"
@@ -21,57 +22,6 @@ export function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
-const formScript = `
-<script>
-document.querySelectorAll("form").forEach((f) => {
-  f.addEventListener("submit", () => {
-    const b = f.querySelector('button[type="submit"]');
-    if (b) { b.disabled = true; b.textContent = "Salvando..."; }
-  });
-});
-</script>`;
-
-const spaScript = `
-<script>
-(function () {
-  const main = document.querySelector(".content");
-  if (!main) return;
-  document.querySelectorAll(".sidebar .nav a[href^='/']").forEach((link) => {
-    link.addEventListener("click", async (e) => {
-      if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-      const href = link.getAttribute("href");
-      if (!href || href === "#") return;
-      e.preventDefault();
-      main.style.opacity = "0.55";
-      main.style.pointerEvents = "none";
-      try {
-        const res = await fetch(href, { headers: { "X-Panel-Partial": "1" }, credentials: "same-origin" });
-        const html = await res.text();
-        const doc = new DOMParser().parseFromString(html, "text/html");
-        const next = doc.querySelector(".content");
-        const title = doc.querySelector(".topbar h1");
-        if (next) main.innerHTML = next.innerHTML;
-        if (title) {
-          const h = document.querySelector(".topbar h1");
-          if (h) h.textContent = title.textContent;
-        }
-        document.querySelectorAll(".sidebar .nav a").forEach((a) => a.classList.remove("active"));
-        link.classList.add("active");
-        history.pushState({}, "", href);
-        document.querySelectorAll("form").forEach((f) => {
-          f.addEventListener("submit", () => {
-            const b = f.querySelector('button[type="submit"]');
-            if (b) { b.disabled = true; b.textContent = "Salvando..."; }
-          });
-        });
-      } finally {
-        main.style.opacity = "1";
-        main.style.pointerEvents = "";
-      }
-    });
-  });
-})();
-</script>`;
 
 function navItem(href: string, label: string, icon: string, active: boolean) {
   const cls = active ? "active" : "";
@@ -79,7 +29,7 @@ function navItem(href: string, label: string, icon: string, active: boolean) {
 }
 
 export function appLayout(title: string, active: NavId, body: string, partial = false) {
-  if (partial) return `${body}${formScript}`;
+  if (partial) return body;
 
   const is = (id: NavId) => active === id;
 
@@ -121,7 +71,10 @@ export function appLayout(title: string, active: NavId, body: string, partial = 
       <header class="topbar">
         <div class="topbar-left"><h1>${escapeHtml(title)}</h1></div>
         <div class="topbar-right">
-          <button type="button" class="icon-btn">${icons.bell}</button>
+          <div class="bell-wrap">
+            <button type="button" class="icon-btn bell-btn" aria-label="Notificações">${icons.bell}<span class="bell-badge" style="display:none">!</span></button>
+            <div id="bell-menu" class="bell-menu"></div>
+          </div>
           <div class="user-pill">
             <div class="user-avatar">KS</div>
             <div><div class="name">Kauan Store</div><div class="role">Administrador</div></div>
@@ -132,7 +85,8 @@ export function appLayout(title: string, active: NavId, body: string, partial = 
       <footer class="footer">© 2026 BotManager. Todos os direitos reservados.</footer>
     </div>
   </div>
-${formScript}${spaScript}
+  <div id="panel-toasts" class="panel-toasts"></div>
+${panelClientScript}
 </body>
 </html>`;
 }
