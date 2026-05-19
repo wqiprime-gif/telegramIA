@@ -1,18 +1,19 @@
 import type { BotConfig } from "../bots.js";
 import { icons } from "./icons.js";
 import { alertHtml, appLayout, botHandle, botInitials, escapeHtml } from "./layout.js";
+import { salesChartSvgFromData } from "./pages.js";
 import { globalStyles } from "./styles.js";
 
-function salesChartSvg() {
-  return `<svg class="chart-svg" viewBox="0 0 400 160" preserveAspectRatio="none">
-    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="rgba(139,92,246,0.35)"/>
-      <stop offset="100%" stop-color="rgba(139,92,246,0)"/>
-    </linearGradient></defs>
-    <path d="M0,120 L50,100 L100,110 L150,70 L200,85 L250,45 L300,60 L350,30 L400,50 L400,160 L0,160 Z" fill="url(#g)"/>
-    <polyline points="0,120 50,100 100,110 150,70 200,85 250,45 300,60 350,30 400,50" fill="none" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round"/>
-  </svg>`;
-}
+export type DashboardData = {
+  stats: {
+    leads: number;
+    salesTotalCents: number;
+    salesCount: number;
+    messagesToday: number;
+  };
+  chart: { day: string; totalCents: number }[];
+  recentSales: Record<string, unknown>[];
+};
 
 function instancesTable(bots: BotConfig[]) {
   if (bots.length === 0) {
@@ -145,9 +146,16 @@ export function loginPage(message = "") {
 </html>`.replaceAll("<div", "<div").replaceAll("</div>", "</div>");
 }
 
-export function dashboardPage(bots: BotConfig[], message = "", isError = false) {
+export function dashboardPage(
+  bots: BotConfig[],
+  data: DashboardData,
+  message = "",
+  isError = false,
+  partial = false
+) {
   const active = bots.filter((b) => b.active).length;
   const previews = bots.reduce((s, b) => s + b.previewMediaUrls.length, 0);
+  const salesReais = (data.stats.salesTotalCents / 100).toFixed(2).replace(".", ",");
 
   const body = `
     ${message ? alertHtml(message, isError ? "error" : "success") : ""}
@@ -164,16 +172,16 @@ export function dashboardPage(bots: BotConfig[], message = "", isError = false) 
         <div class="stat-icon green">${icons.users}</div>
         <div>
           <div class="stat-label">Leads</div>
-          <div class="stat-value">—</div>
-          <div class="stat-delta" style="color:var(--muted)">em breve</div>
+          <div class="stat-value">${data.stats.leads}</div>
+          <div class="stat-delta">${data.stats.messagesToday} msgs hoje</div>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon blue">${icons.card}</div>
         <div>
           <div class="stat-label">Vendas</div>
-          <div class="stat-value">R$ 0</div>
-          <div class="stat-delta" style="color:var(--muted)">em breve</div>
+          <div class="stat-value">R$ ${salesReais}</div>
+          <div class="stat-delta">${data.stats.salesCount} venda(s)</div>
         </div>
       </div>
       <div class="stat-card">
@@ -221,7 +229,7 @@ export function dashboardPage(bots: BotConfig[], message = "", isError = false) 
       </div>
       <div class="card">
         <div class="card-head"><h3>Vendas — Últimos 7 dias</h3></div>
-        <div class="card-body chart-wrap">${salesChartSvg()}</div>
+        <div class="card-body chart-wrap">${salesChartSvgFromData(data.chart)}</div>
       </div>
       <div class="card">
         <div class="card-head"><h3>Top Instâncias</h3></div>
@@ -229,7 +237,7 @@ export function dashboardPage(bots: BotConfig[], message = "", isError = false) 
       </div>
     </div>`;
 
-  return appLayout("Dashboard", "dashboard", body.replaceAll("<div", "<div").replaceAll("</div>", "</div>"));
+  return appLayout("Dashboard", "dashboard", body, partial);
 }
 
 export function instancesPage(bots: BotConfig[], message = "", isError = false) {
@@ -288,11 +296,19 @@ export function newInstancePage(message = "", isError = false) {
                 <input name="deliveryFiles" type="file" accept="image/*,video/*,audio/*,application/pdf" multiple />
               </div>
             </label>
-            <label class="field span-2">Links prévia <small style="color:var(--muted)">opcional</small>
-              <textarea name="previewMediaUrls" placeholder="https://..."></textarea>
+            <label class="field">Forma de pagamento
+              <select name="paymentMethod">
+                <option value="pix">Pix manual (chave)</option>
+                <option value="laranjinha">Gateway Laranjinha</option>
+              </select>
             </label>
-            <label class="field span-2">Links entrega <small style="color:var(--muted)">opcional</small>
-              <textarea name="deliveryMediaUrls" placeholder="https://..."></textarea>
+            <label class="field">API Key Laranjinha <small style="color:var(--muted)">se gateway</small>
+              <input name="laranjinhaApiKey" type="password" placeholder="sua chave API" autocomplete="off" />
+            </label>
+            <label class="field">Produto / plano<input name="productName" value="VIP Gold" required /></label>
+            <label class="field">Preço (R$)<input name="productPrice" type="number" step="0.01" min="1" value="97" required /></label>
+            <label class="field span-2">Link do grupo Telegram (entrega após pagamento)
+              <input name="telegramGroupLink" placeholder="https://t.me/+seu_grupo_vip" />
             </label>
           </div>
           <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px">Salvar e ativar instância</button>

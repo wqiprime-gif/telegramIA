@@ -117,5 +117,9 @@ export async function initDatabase() {
   `);
 
   await migrateFromJsonFiles();
+
+  const { initEventsSchema } = await import("./events.js");
+  await initEventsSchema();
+
   console.log("[db] PostgreSQL conectado e schema pronto.");
 }

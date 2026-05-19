@@ -13,6 +13,9 @@ import {
 } from "./bots.js";
 import { env } from "./config.js";
 import { initDatabase, useDatabase } from "./db/index.js";
+import { logMessage, logReceipt, logSale, upsertLead } from "./db/events.js";
+import { decryptSecret } from "./lib/crypto.js";
+import { createLaranjinhaCharge } from "./lib/laranjinha.js";
 import { getOpenAIApiKey, getOpenAIModel } from "./lib/settings.js";
 import { registerPanelRoutes } from "./panel/routes.js";
 
@@ -173,24 +176,103 @@ async function analyzeReceiptPdf(input: { pdfUrl: string; pixKey: string }) {
   return analyzeReceiptText({ text, pixKey: input.pixKey });
 }
 
+async function deliverProduct(input: {
+  bot: Telegraf;
+  config: BotConfig;
+  chatId: number;
+  reply: (message: string) => Promise<unknown>;
+  paymentMethod: string;
+}) {
+  await logSale({
+    botId: input.config.id,
+    chatId: input.chatId,
+    productName: input.config.productName,
+    amountCents: input.config.productPriceCents,
+    paymentMethod: input.paymentMethod
+  });
+
+  await input.reply(`Pagamento aprovado! Liberando seu acesso...`);
+  await sleep(input.config.messageDelayMs);
+
+  if (input.config.telegramGroupLink) {
+    await input.reply(
+      `Seu grupo VIP:\n${input.config.telegramGroupLink}\n\nEntre pelo link acima. Qualquer duvida, me chama aqui.`
+    );
+    await logMessage({
+      botId: input.config.id,
+      chatId: input.chatId,
+      role: "system",
+      content: `Entrega grupo: ${input.config.telegramGroupLink}`
+    });
+  }
+
+  if (input.config.deliveryMediaUrls.length > 0) {
+    await sendMediaList(input.bot, input.chatId, input.config.deliveryMediaUrls);
+  } else if (!input.config.telegramGroupLink) {
+    await input.reply("Produto liberado, mas configure entrega (grupo ou midia) no painel.");
+  }
+}
+
 async function handleReceiptResult(input: {
   result: ReceiptAnalysis;
   chatId: number;
   reply: (message: string) => Promise<unknown>;
   bot: Telegraf;
   config: BotConfig;
+  fileUrl?: string;
+  fileType?: string;
 }) {
+  await logReceipt({
+    botId: input.config.id,
+    chatId: input.chatId,
+    fileUrl: input.fileUrl,
+    fileType: input.fileType,
+    paid: input.result.paid,
+    confidence: input.result.confidence,
+    reason: input.result.reason
+  });
+
   if (input.result.paid) {
-    await input.reply(`Pagamento aprovado. Confiança: ${Math.round(input.result.confidence * 100)}%.`);
-    await sleep(input.config.messageDelayMs);
-    await sendMediaList(input.bot, input.chatId, input.config.deliveryMediaUrls);
-    if (input.config.deliveryMediaUrls.length === 0) {
-      await input.reply("Entrega liberada, mas sem midia cadastrada no painel.");
-    }
+    await deliverProduct({
+      bot: input.bot,
+      config: input.config,
+      chatId: input.chatId,
+      reply: input.reply,
+      paymentMethod: input.config.paymentMethod
+    });
     return;
   }
   await input.reply(
     `Nao consegui aprovar automaticamente.\nMotivo: ${input.result.reason}\n\nRevisao manual necessaria.`
+  );
+}
+
+async function sendPaymentInstructions(
+  ctx: { reply: (msg: string) => Promise<unknown>; chat: { id: number } },
+  config: BotConfig
+) {
+  await sleep(config.messageDelayMs);
+
+  if (config.paymentMethod === "laranjinha" && config.laranjinhaApiKeyEncrypted) {
+    try {
+      const apiKey = decryptSecret(config.laranjinhaApiKeyEncrypted);
+      const charge = await createLaranjinhaCharge({
+        apiKey,
+        amountCents: config.productPriceCents,
+        description: config.productName
+      });
+      await ctx.reply(
+        `Pagamento via Laranjinha — ${config.productName}\nValor: R$ ${(config.productPriceCents / 100).toFixed(2).replace(".", ",")}\n\nCopie o Pix:\n${charge.brCode}\n\nDepois envie o comprovante aqui.`
+      );
+      return;
+    } catch (error) {
+      console.error("Laranjinha:", error);
+      await ctx.reply("Gateway indisponivel. Use a chave Pix abaixo.");
+    }
+  }
+
+  await ctx.reply(
+    `Chave Pix:\n${config.pixKey}\n\nProduto: ${config.productName} — R$ ${(config.productPriceCents / 100).toFixed(2).replace(".", ",")}\n\nEnvie o comprovante como imagem ou PDF.`
   );
 }
 
@@ -200,11 +282,18 @@ async function startBot(config: BotConfig) {
   const bot = new Telegraf(config.token);
   const runtime: RuntimeBot = { config, bot, historyByChat: new Map() };
 
-  bot.start((ctx) => ctx.reply("Oi. Me manda uma mensagem que eu te atendo por aqui."));
+  bot.start(async (ctx) => {
+    const from = ctx.from;
+    await upsertLead({
+      botId: config.id,
+      chatId: ctx.chat.id,
+      username: from?.username,
+      displayName: [from?.first_name, from?.last_name].filter(Boolean).join(" ")
+    });
+    await ctx.reply("Oi. Me manda uma mensagem que eu te atendo por aqui.");
+  });
 
-  bot.command("pix", (ctx) =>
-    ctx.reply(`Chave Pix:\n${config.pixKey}\n\nEnvie o comprovante como imagem ou PDF.`)
-  );
+  bot.command("pix", async (ctx) => sendPaymentInstructions(ctx, config));
 
   bot.on("photo", async (ctx) => {
     try {
@@ -217,7 +306,9 @@ async function startBot(config: BotConfig) {
         chatId: ctx.chat.id,
         reply: ctx.reply.bind(ctx),
         bot,
-        config
+        config,
+        fileUrl: fileUrl.href,
+        fileType: "image"
       });
     } catch (error) {
       console.error(error);
@@ -247,7 +338,9 @@ async function startBot(config: BotConfig) {
         chatId: ctx.chat.id,
         reply: ctx.reply.bind(ctx),
         bot,
-        config
+        config,
+        fileUrl: fileUrl.href,
+        fileType: isPdfFile(fileName, mimeType) ? "pdf" : "image"
       });
     } catch (error) {
       console.error(error);
@@ -258,6 +351,15 @@ async function startBot(config: BotConfig) {
   bot.on("text", async (ctx) => {
     const chatId = ctx.chat.id;
     const text = ctx.message.text;
+    const from = ctx.from;
+    await upsertLead({
+      botId: config.id,
+      chatId,
+      username: from?.username,
+      displayName: [from?.first_name, from?.last_name].filter(Boolean).join(" ")
+    });
+    await logMessage({ botId: config.id, chatId, role: "user", content: text });
+
     const history = runtime.historyByChat.get(chatId) || [];
     runtime.historyByChat.set(chatId, history);
 
@@ -269,8 +371,7 @@ async function startBot(config: BotConfig) {
     }
 
     if (wantsPix(text)) {
-      await sleep(config.messageDelayMs);
-      await ctx.reply(`Chave Pix:\n${config.pixKey}\n\nEnvie o comprovante como imagem ou PDF.`);
+      await sendPaymentInstructions(ctx, config);
     }
 
     try {
@@ -290,6 +391,7 @@ async function startBot(config: BotConfig) {
       });
       const reply = completion.choices[0]?.message.content?.trim() || "Me chama de novo.";
       history.push({ role: "user", content: text }, { role: "assistant", content: reply });
+      await logMessage({ botId: config.id, chatId, role: "assistant", content: reply });
       await sleep(config.messageDelayMs);
       await ctx.reply(reply);
     } catch (error) {

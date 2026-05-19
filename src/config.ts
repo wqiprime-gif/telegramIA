@@ -27,7 +27,8 @@ const envSchema = z.object({
   DELIVERY_MEDIA_URLS: z.string().default(""),
   DATABASE_URL: z.string().default(""),
   DATABASE_PUBLIC_URL: z.string().default(""),
-  DATA_DIR: z.string().default("")
+  DATA_DIR: z.string().default(""),
+  LARANJINHA_API_BASE: z.string().default("https://laranjinha.digital/api")
 });
 
 function loadEnv() {

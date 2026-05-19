@@ -3,27 +3,36 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import cookie from "@fastify/cookie";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
 import { useDatabase } from "../db/index.js";
 import {
-  loadBots,
-  parseUrls,
-  saveBots,
-  uploadsDir,
-} from "../bots.js";
+  dashboardStats,
+  listConversations,
+  listLeads,
+  listProducts,
+  listReceipts,
+  listSales,
+  salesByDay,
+  saveProduct
+} from "../db/events.js";
+import { loadBots, saveBots, uploadsDir } from "../bots.js";
+import { encryptSecret } from "../lib/crypto.js";
 import {
   clearSessionCookie,
   isAuthenticated,
   requireAuth,
   setSessionCookie
 } from "../lib/session.js";
+import { getApiKeyStatus, getOpenAIModel, updateOpenAISettings } from "../lib/settings.js";
 import {
-  getApiKeyStatus,
-  getOpenAIModel,
-  updateOpenAISettings
-} from "../lib/settings.js";
+  conversationsPage,
+  leadsPage,
+  mediaPage,
+  paymentsPage,
+  productsPage
+} from "./pages.js";
 import {
   dashboardPage,
   instancesPage,
@@ -38,11 +47,7 @@ async function saveUploadedFile(file: AsyncIterable<Buffer>, originalName: strin
   const fileName = `${Date.now()}-${randomUUID()}-${safeName}`;
   const filePath = path.join(uploadsDir, fileName);
   const chunks: Buffer[] = [];
-
-  for await (const chunk of file) {
-    chunks.push(chunk);
-  }
-
+  for await (const chunk of file) chunks.push(chunk);
   await fs.writeFile(filePath, Buffer.concat(chunks));
   return `/uploads/${fileName}`;
 }
@@ -58,18 +63,17 @@ function mimeTypeFromPath(filePath: string) {
 }
 
 function flashRedirect(path: string, message: string, type: "ok" | "err" = "ok") {
-  const params = new URLSearchParams({ msg: message, t: type });
-  return `${path}?${params.toString()}`;
+  return `${path}?${new URLSearchParams({ msg: message, t: type }).toString()}`;
 }
 
 function errorMessage(error: unknown) {
-  if (error instanceof z.ZodError) {
-    return error.issues.map((i) => i.message).join(", ");
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
+  if (error instanceof z.ZodError) return error.issues.map((i) => i.message).join(", ");
+  if (error instanceof Error) return error.message;
   return "Erro desconhecido.";
+}
+
+function isPartial(request: FastifyRequest) {
+  return request.headers["x-panel-partial"] === "1";
 }
 
 export async function registerPanelRoutes(
@@ -79,14 +83,10 @@ export async function registerPanelRoutes(
   await app.register(cookie);
 
   app.addHook("onRequest", async (request, reply) => {
-    const path = request.url.split("?")[0];
+    const urlPath = request.url.split("?")[0];
     const publicPaths = ["/login", "/uploads", "/health"];
-    if (publicPaths.some((p) => path === p || path.startsWith(`${p}/`))) {
-      return;
-    }
-    if (!isAuthenticated(request)) {
-      return reply.redirect("/login");
-    }
+    if (publicPaths.some((p) => urlPath === p || urlPath.startsWith(`${p}/`))) return;
+    if (!isAuthenticated(request)) return reply.redirect("/login");
   });
 
   app.get("/health", async (_request, reply) => {
@@ -94,9 +94,7 @@ export async function registerPanelRoutes(
   });
 
   app.get("/login", async (request, reply) => {
-    if (isAuthenticated(request)) {
-      return reply.redirect("/");
-    }
+    if (isAuthenticated(request)) return reply.redirect("/");
     return reply.type("text/html").send(loginPage());
   });
 
@@ -118,15 +116,78 @@ export async function registerPanelRoutes(
     if (!requireAuth(request, reply)) return;
     const query = z.object({ msg: z.string().optional(), t: z.string().optional() }).parse(request.query);
     const bots = await loadBots();
-    const isError = query.t === "err";
-    return reply.type("text/html").send(dashboardPage(bots, query.msg, isError));
+    const partial = isPartial(request);
+    const html = dashboardPage(
+      bots,
+      {
+        stats: await dashboardStats(),
+        chart: await salesByDay(7),
+        recentSales: await listSales(10)
+      },
+      query.msg,
+      query.t === "err",
+      partial
+    );
+    return reply.type("text/html").send(html);
+  });
+
+  app.get("/leads", async (request, reply) => {
+    if (!requireAuth(request, reply)) return;
+    const html = leadsPage(await listLeads(200), isPartial(request));
+    return reply.type("text/html").send(html);
+  });
+
+  app.get("/conversations", async (request, reply) => {
+    if (!requireAuth(request, reply)) return;
+    const html = conversationsPage(await listConversations(120), isPartial(request));
+    return reply.type("text/html").send(html);
+  });
+
+  app.get("/payments", async (request, reply) => {
+    if (!requireAuth(request, reply)) return;
+    const html = paymentsPage(await listReceipts(80), isPartial(request));
+    return reply.type("text/html").send(html);
+  });
+
+  app.get("/products", async (request, reply) => {
+    if (!requireAuth(request, reply)) return;
+    const query = z.object({ msg: z.string().optional() }).parse(request.query);
+    const bots = await loadBots();
+    const html = productsPage(bots, await listProducts(), query.msg, isPartial(request));
+    return reply.type("text/html").send(html);
+  });
+
+  app.post("/products", async (request, reply) => {
+    if (!requireAuth(request, reply)) return;
+    try {
+      const body = z
+        .object({
+          botId: z.string().min(1),
+          name: z.string().min(1),
+          price: z.coerce.number().min(1)
+        })
+        .parse(request.body);
+      await saveProduct({
+        botId: body.botId,
+        name: body.name,
+        priceCents: Math.round(body.price * 100)
+      });
+      return reply.redirect(flashRedirect("/products", "Produto salvo!"));
+    } catch (error) {
+      return reply.redirect(flashRedirect("/products", `Erro: ${errorMessage(error)}`, "err"));
+    }
+  });
+
+  app.get("/media", async (request, reply) => {
+    if (!requireAuth(request, reply)) return;
+    const html = mediaPage(await loadBots(), isPartial(request));
+    return reply.type("text/html").send(html);
   });
 
   app.get("/instances", async (request, reply) => {
     if (!requireAuth(request, reply)) return;
     const query = z.object({ msg: z.string().optional(), t: z.string().optional() }).parse(request.query);
-    const bots = await loadBots();
-    return reply.type("text/html").send(instancesPage(bots, query.msg, query.t === "err"));
+    return reply.type("text/html").send(instancesPage(await loadBots(), query.msg, query.t === "err"));
   });
 
   app.get("/instances/new", async (request, reply) => {
@@ -140,11 +201,10 @@ export async function registerPanelRoutes(
     const query = z.object({ msg: z.string().optional(), t: z.string().optional() }).parse(request.query);
     const status = await getApiKeyStatus();
     const model = await getOpenAIModel();
-    const isError = query.t === "err";
     return reply.type("text/html").send(
       settingsPage({
         message: query.msg,
-        messageIsError: isError,
+        messageIsError: query.t === "err",
         maskedKey: status.masked,
         configured: status.configured,
         source: status.source,
@@ -155,26 +215,14 @@ export async function registerPanelRoutes(
 
   app.post("/settings", async (request, reply) => {
     if (!requireAuth(request, reply)) return;
-
     try {
       const body = z
-        .object({
-          openaiApiKey: z.string().optional(),
-          openaiModel: z.string().optional()
-        })
+        .object({ openaiApiKey: z.string().optional(), openaiModel: z.string().optional() })
         .parse(request.body ?? {});
-
-      await updateOpenAISettings({
-        apiKey: body.openaiApiKey,
-        model: body.openaiModel
-      });
-
-      return reply.redirect(flashRedirect("/settings", "Configurações salvas com sucesso!"));
+      await updateOpenAISettings({ apiKey: body.openaiApiKey, model: body.openaiModel });
+      return reply.redirect(flashRedirect("/settings", "Configurações salvas!"));
     } catch (error) {
-      request.log.error(error);
-      return reply.redirect(
-        flashRedirect("/settings", `Erro ao salvar: ${errorMessage(error)}`, "err")
-      );
+      return reply.redirect(flashRedirect("/settings", `Erro: ${errorMessage(error)}`, "err"));
     }
   });
 
@@ -182,19 +230,16 @@ export async function registerPanelRoutes(
     const params = z.object({ file: z.string().min(1) }).parse(request.params);
     const fileName = path.basename(params.file);
     const filePath = path.join(uploadsDir, fileName);
-
     try {
       await fs.access(filePath);
     } catch {
       return reply.code(404).send("Arquivo nao encontrado.");
     }
-
     return reply.type(mimeTypeFromPath(filePath)).send(fsSync.createReadStream(filePath));
   });
 
   app.post("/bots", async (request, reply) => {
     if (!requireAuth(request, reply)) return;
-
     try {
       const fields: Record<string, string> = {};
       const previewUploads: string[] = [];
@@ -216,11 +261,14 @@ export async function registerPanelRoutes(
           name: z.string().min(1),
           token: z.string().min(20),
           prompt: z.string().min(1),
-          pixKey: z.string().min(1),
+          pixKey: z.string().default(""),
           messageDelayMs: z.coerce.number().default(1500),
-          previewMediaUrls: z.string().default(""),
-          deliveryMediaUrls: z.string().default(""),
-          active: z.enum(["true", "false"]).default("true")
+          active: z.enum(["true", "false"]).default("true"),
+          paymentMethod: z.enum(["pix", "laranjinha"]).default("pix"),
+          laranjinhaApiKey: z.string().optional(),
+          productName: z.string().default("VIP"),
+          productPrice: z.coerce.number().default(97),
+          telegramGroupLink: z.string().default("")
         })
         .parse(fields);
 
@@ -230,44 +278,45 @@ export async function registerPanelRoutes(
         name: body.name,
         token: body.token,
         prompt: body.prompt,
-        pixKey: body.pixKey,
+        pixKey: body.pixKey || "nao-configurado",
         messageDelayMs: body.messageDelayMs,
-        previewMediaUrls: [...parseUrls(body.previewMediaUrls), ...previewUploads],
-        deliveryMediaUrls: [...parseUrls(body.deliveryMediaUrls), ...deliveryUploads],
-        active: body.active === "true"
+        previewMediaUrls: previewUploads,
+        deliveryMediaUrls: deliveryUploads,
+        active: body.active === "true",
+        paymentMethod: body.paymentMethod,
+        laranjinhaApiKeyEncrypted: body.laranjinhaApiKey?.trim()
+          ? encryptSecret(body.laranjinhaApiKey.trim())
+          : undefined,
+        productName: body.productName,
+        productPriceCents: Math.round(body.productPrice * 100),
+        telegramGroupLink: body.telegramGroupLink.trim()
       });
 
       await saveBots(bots);
       hooks.restartBots();
-
-      return reply.redirect(
-        flashRedirect("/instances", "Instância salva! Ativando em segundo plano.")
-      );
+      return reply.redirect(flashRedirect("/instances", "Instância salva! Ativando..."));
     } catch (error) {
       request.log.error(error);
-      return reply.redirect(flashRedirect("/", `Erro ao salvar bot: ${errorMessage(error)}`, "err"));
+      return reply.redirect(flashRedirect("/instances/new", `Erro: ${errorMessage(error)}`, "err"));
     }
   });
 
   app.post("/bots/:id/delete", async (request, reply) => {
     if (!requireAuth(request, reply)) return;
-
     try {
       const params = z.object({ id: z.string().min(1) }).parse(request.params);
       const bots = await loadBots();
-      const nextBots = bots.filter((bot) => bot.id !== params.id);
-      await saveBots(nextBots);
+      await saveBots(bots.filter((b) => b.id !== params.id));
       hooks.restartBots();
       return reply.redirect(flashRedirect("/", "Bot removido."));
     } catch (error) {
-      request.log.error(error);
-      return reply.redirect(flashRedirect("/", `Erro ao remover: ${errorMessage(error)}`, "err"));
+      return reply.redirect(flashRedirect("/", `Erro: ${errorMessage(error)}`, "err"));
     }
   });
 
   app.post("/restart", async (request, reply) => {
     if (!requireAuth(request, reply)) return;
     hooks.restartBots();
-    return reply.redirect(flashRedirect("/", "Bots reiniciando em segundo plano..."));
+    return reply.redirect(flashRedirect("/", "Bots reiniciando..."));
   });
 }
