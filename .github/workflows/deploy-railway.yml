@@ -1,0 +1,43 @@
+# Deploy automático no Railway a cada push na main.
+# Configure em GitHub → Settings → Secrets and variables → Actions:
+#   RAILWAY_TOKEN  = token em https://railway.com/account/tokens
+#   RAILWAY_SERVICE_ID = ID do serviço telegramIA (Settings → General)
+
+name: Deploy Railway
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: railway-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          test -n "$RAILWAY_TOKEN" || (echo "Falta secret RAILWAY_TOKEN — leia DEPLOY-RAILWAY.md" && exit 1)
+          test -n "${{ secrets.RAILWAY_SERVICE_ID }}" || (echo "Falta secret RAILWAY_SERVICE_ID" && exit 1)
+          railway redeploy --service "${{ secrets.RAILWAY_SERVICE_ID }}" --yes
