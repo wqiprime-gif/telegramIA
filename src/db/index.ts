@@ -114,39 +114,40 @@ export async function initDatabase() {
   }
 
   pool = db;
-  try {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS bots (
-      id UUID PRIMARY KEY,
-      name TEXT NOT NULL,
-      token TEXT NOT NULL,
-      prompt TEXT NOT NULL,
-      pix_key TEXT NOT NULL,
-      message_delay_ms INTEGER NOT NULL DEFAULT 1500,
-      preview_media_urls JSONB NOT NULL DEFAULT '[]',
-      delivery_media_urls JSONB NOT NULL DEFAULT '[]',
-      active BOOLEAN NOT NULL DEFAULT true,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS app_settings (
-      id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-      openai_api_key_encrypted TEXT,
-      openai_model TEXT NOT NULL DEFAULT 'gpt-4o-mini',
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  await migrateFromJsonFiles(db);
-
-  const { initUsersSchema } = await import("./users.js");
-  await initUsersSchema();
-
-  const { initEventsSchema } = await import("./events.js");
-  await initEventsSchema();
-
   dbAvailable = true;
-  console.log("[db] PostgreSQL conectado e schema pronto.");
+
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS bots (
+        id UUID PRIMARY KEY,
+        name TEXT NOT NULL,
+        token TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        pix_key TEXT NOT NULL,
+        message_delay_ms INTEGER NOT NULL DEFAULT 1500,
+        preview_media_urls JSONB NOT NULL DEFAULT '[]',
+        delivery_media_urls JSONB NOT NULL DEFAULT '[]',
+        active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS app_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+        openai_api_key_encrypted TEXT,
+        openai_model TEXT NOT NULL DEFAULT 'gpt-4o-mini',
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    const { initUsersSchema } = await import("./users.js");
+    await initUsersSchema();
+
+    const { initEventsSchema } = await import("./events.js");
+    await initEventsSchema();
+
+    await migrateFromJsonFiles(db);
+
+    console.log("[db] PostgreSQL conectado e schema pronto.");
   } catch (error) {
     await pool?.end().catch(() => {});
     pool = null;
