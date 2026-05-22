@@ -14,14 +14,24 @@ export function useDatabase() {
   return dbAvailable;
 }
 
+function postgresSsl(url: string) {
+  if (url.includes("sslmode=require") || url.includes("sslmode=verify")) {
+    return { rejectUnauthorized: false };
+  }
+  // Rede interna do Railway (postgres.railway.internal) NAO usa SSL
+  if (url.includes(".railway.internal") || url.includes("localhost")) return undefined;
+  if (url.includes("railway.app") || url.includes("rlwy.net")) {
+    return { rejectUnauthorized: false };
+  }
+  return undefined;
+}
+
 function createPool() {
   const url = env.DATABASE_URL?.trim();
   if (!url) throw new Error("DATABASE_URL nao configurada.");
   return new pg.Pool({
     connectionString: url,
-    ssl: url.includes("railway") || url.includes("sslmode=require")
-      ? { rejectUnauthorized: false }
-      : undefined
+    ssl: postgresSsl(url)
   });
 }
 
@@ -106,10 +116,10 @@ export async function initDatabase() {
     if (db) await db.end().catch(() => {});
     pool = null;
     const msg = error instanceof Error ? error.message : String(error);
-    console.warn(
-      `[db] Postgres indisponivel (${msg}) — usando pasta data/ para rodar o painel localmente.`
-    );
-    console.warn("[db] Para usar Postgres: docker compose up -d e DATABASE_URL no .env");
+    console.warn(`[db] Postgres indisponivel (${msg}) — painel em modo arquivo (data/).`);
+    if (url.includes("railway")) {
+      console.warn("[db] Railway: confira DATABASE_URL referenciada ao Postgres e faca Redeploy.");
+    }
     return;
   }
 
