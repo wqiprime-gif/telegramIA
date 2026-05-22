@@ -562,11 +562,16 @@ await registerPanelRoutes(app, {
 await app.listen({ port: env.PORT, host: "0.0.0.0" });
 
 await ensureDataFile();
-const botsOnStart = await loadBots();
+let botsOnStart = 0;
+try {
+  botsOnStart = (await loadBots()).length;
+} catch (error) {
+  console.error("[startup] Erro ao carregar bots (painel segue online):", error);
+}
 const localBase = `http://127.0.0.1:${env.PORT}`;
 console.log("[startup] Servidor online na porta", env.PORT);
 console.log("[startup] Banco:", useDatabase() ? "PostgreSQL OK" : "arquivos locais (data/)");
-console.log("[startup] Bots cadastrados:", botsOnStart.length);
+console.log("[startup] Bots cadastrados:", botsOnStart);
 console.log("[startup] Painel local:", `${localBase}/login`);
 console.log("[startup] Health:", `${localBase}/health`);
 console.log(
