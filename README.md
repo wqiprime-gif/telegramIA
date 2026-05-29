@@ -1,6 +1,8 @@
 # Bot Telegram IA
 
-Projeto simples para rodar no Railway com:
+**Repositório:** https://github.com/wqiprime-gif/telegramIA
+
+Projeto para rodar no Railway com:
 
 - Painel web para cadastrar bots.
 - Prompt/persona por bot.

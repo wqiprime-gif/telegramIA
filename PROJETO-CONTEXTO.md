@@ -28,7 +28,7 @@
 | Motor conversa | `src/index.ts` | `bot-instance.js` |
 | Painel | Fastify `src/panel/` | `hotbot-admin/` |
 | Produção | Railway `bottelegram-production-8449.up.railway.app` | Subir na Railway (Fase 2) |
-| Repo | `telegramIA` + `bot_telegram` | Integrar ou monorepo futuro |
+| Repo | **`wqiprime-gif/telegramIA`** (oficial) · `legacy` = bot_telegram antigo | Integrar WhatsApp depois |
 
 ---
 
@@ -264,7 +264,8 @@ Testar **no Telegram real** após cada release:
 - [RAILWAY-SETUP.md](./RAILWAY-SETUP.md)
 - [LOCAL.md](./LOCAL.md)
 - [prompts/PROMPT-BYANCA-REFERENCIA.md](./prompts/PROMPT-BYANCA-REFERENCIA.md)
-- Repo: https://github.com/wqiprime-gif/telegramIA
+- Repo oficial: https://github.com/wqiprime-gif/telegramIA — `git push origin main`
+- Railway: reconectar Source para **telegramIA** quando arrumar conta (ver RAILWAY-AGORA.md)
 
 ---
 

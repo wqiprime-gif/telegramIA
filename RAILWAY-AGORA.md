@@ -1,55 +1,29 @@
-# Atualizar o Railway AGORA (sem token)
+# Atualizar o Railway (quando reconectar ao repo certo)
 
-O código **já está no GitHub**: https://github.com/kauan123749578/bot_telegram (commit `2b2e3ad`).
+**Repositório oficial do código:** https://github.com/wqiprime-gif/telegramIA
 
-O site ainda mostra **0.4.2** porque o Railway está com erro **"GitHub Repo not found"** — ele não puxa commit novo.
-
----
-
-## Faça só isso (2 minutos)
-
-### 1. Abra o serviço certo
-- railway.app → projeto **reliable-reflection** → clique no card **bot_telegram** (não no Postgres)
-
-### 2. Aba Settings (você já está aí)
-- Em **Source Repo** está `kauan123749578/bot_telegram`
-- Clique no botão vermelho **Disconnect**
-
-### 3. Conectar de novo
-- Clique **Connect Repo** (ou **Connect GitHub**)
-- Autorize o GitHub se pedir
-- Escolha: **kauan123749578/bot_telegram**
-- Branch: **main**
-- Salve
-
-### 4. Deploy
-- Vá na aba **Deployments** (ao lado de Settings)
-- Clique **Deploy** → **Deploy latest commit**
-- Espere ficar **ACTIVE** (verde)
-
-### 5. Testar
-Abra: https://bottelegram-production-8449.up.railway.app/health
-
-Deve aparecer: `"version": "0.5.1"`
+O Railway **ainda** pode estar ligado à conta/repo antigo (`kauan123749578/bot_telegram`). Por isso o site fica em **0.4.2** mesmo com código novo no GitHub.
 
 ---
 
-## Se o deploy falhar de novo (vermelho "network process")
+## Quando for arrumar o Railway (uma vez)
 
-1. **Settings** → **Networking** → porta **3000** (ou a variável `PORT` em Variables)
-2. **Variables** → confira `DATABASE_URL`, `PANEL_PASSWORD`, `OPENAI_API_KEY`
-3. **Deployments** → clique no deploy falho → **View logs** → mande o erro
+1. Railway → serviço **bot_telegram** → **Settings** → **Disconnect** (Source)
+2. **Connect Repo** → GitHub da conta **wqiprime-gif**
+3. Escolha: **`wqiprime-gif/telegramIA`** · branch **main**
+4. **Deployments** → **Deploy latest commit**
+5. Teste: https://bottelegram-production-8449.up.railway.app/health → `"version": "0.5.1"`
+
+Sem token. Só reconectar o repo certo.
 
 ---
 
-## Daqui pra frente
+## Enquanto isso — desenvolvimento
 
-Sempre que mudar o código:
+Todo push vai só para o repo oficial:
 
 ```bash
 git push origin main
 ```
 
-(`origin` = bot_telegram = o que o Railway lê)
-
-Não precisa de token no GitHub.
+Repo: https://github.com/wqiprime-gif/telegramIA
