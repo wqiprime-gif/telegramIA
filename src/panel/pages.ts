@@ -67,7 +67,7 @@ export function paymentsPage(rows: Record<string, unknown>[], partial?: boolean)
 
 export function productsPage(
   bots: BotConfig[],
-  products: Record<string, unknown>[],
+  products: import("../db/events.js").Product[],
   message?: string,
   partial?: boolean
 ) {
@@ -75,38 +75,45 @@ export function productsPage(
     ${message ? alertHtml(message) : ""}
     <div class="card card-accent-gold" style="margin-bottom:16px">
       <div class="card-body" style="font-size:0.88rem;color:var(--text-2);line-height:1.6">
-        <strong>O que é Produtos?</strong> Catálogo extra por instância (nome + preço) para você organizar planos no painel.
-        O preço e pacotes do bot são definidos pelo fluxo de vendas (prompt + negociação Byanca).
-        Use esta tela para organizar catálogo extra por instância quando tiver vários planos.
+        <strong>O que é Produtos?</strong> Catálogo por instância (ex: R$ 10, R$ 20, R$ 30).
+        Ative <strong>Oferta 50%</strong> para o bot oferecer metade do valor quando o lead disser que não consegue pagar.
       </div>
     </div>
     <div class="grid-2">
-      <div class="card">
+      <div class="card card-premium">
         <div class="card-head"><h3>Novo produto</h3></div>
         <div class="card-body">
           <form method="post" action="/products">
             <label class="field">Instância<select name="botId" required>
               ${bots.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("")}
             </select></label>
-            <label class="field">Nome<input name="name" placeholder="VIP Gold" required /></label>
-            <label class="field">Preço (R$)<input name="price" type="number" step="0.01" min="1" placeholder="97.00" required /></label>
+            <label class="field">Nome<input name="name" placeholder="Pacote Básico" required /></label>
+            <label class="field">Preço (R$)<input name="price" type="number" step="0.01" min="1" placeholder="10.00" required /></label>
+            <label class="field" style="flex-direction:row;align-items:center;gap:10px;margin-top:8px">
+              <input type="checkbox" name="allowHalfPrice" value="true" style="width:auto" />
+              <span>Oferta 50% se lead não conseguir pagar</span>
+            </label>
+            <label class="field">Desconto máximo (%)
+              <input name="halfPricePercent" type="number" min="10" max="90" value="50" />
+            </label>
             <button type="submit" class="btn btn-primary btn-block">Salvar produto</button>
           </form>
         </div>
       </div>
-      <div class="card">
+      <div class="card card-premium">
         <div class="card-head"><h3>Produtos (${products.length})</h3></div>
         <div class="card-body" style="padding:0">
           ${
             products.length === 0
               ? `<div class="empty">Cadastre produtos por instância.</div>`
-              : `<table class="table"><thead><tr><th>Produto</th><th>Bot</th><th>Preço</th></tr></thead><tbody>
+              : `<table class="table"><thead><tr><th>Produto</th><th>Bot</th><th>Preço</th><th>50%</th></tr></thead><tbody>
               ${products
                 .map(
                   (p) => `<tr>
-                  <td><strong>${escapeHtml(String(p.name))}</strong></td>
-                  <td>${escapeHtml(String(p.bot_name || "—"))}</td>
-                  <td class="product-price">${formatMoney(Number(p.price_cents || p.priceCents))}</td>
+                  <td><strong>${escapeHtml(p.name)}</strong></td>
+                  <td>${escapeHtml(p.botName || "—")}</td>
+                  <td class="product-price">${formatMoney(p.priceCents)}</td>
+                  <td>${p.allowHalfPrice ? `${p.halfPricePercent}%` : "—"}</td>
                 </tr>`
                 )
                 .join("")}
@@ -121,35 +128,42 @@ export function productsPage(
 
 export function remarketingPage(
   bots: BotConfig[],
-  selectedBotId: string,
-  leads: { chatId: number; username?: string; displayName?: string }[],
+  selectedBotIds: string[],
+  leads: { botId: string; chatId: number; username?: string; displayName?: string }[],
   message = "",
   isError = false,
   partial?: boolean
 ) {
-  const botOptions =
+  const botNameById = new Map(bots.map((b) => [b.id, b.name]));
+  const botChecks =
     bots.length === 0
-      ? `<option value="">Cadastre uma instância primeiro</option>`
-      : bots
-          .map(
-            (b) =>
-              `<option value="${b.id}" ${b.id === selectedBotId ? "selected" : ""}>${escapeHtml(b.name)}</option>`
-          )
-          .join("");
+      ? `<p class="form-hint">Cadastre uma instância primeiro.</p>`
+      : `<div class="bot-check-grid">
+          ${bots
+            .map(
+              (b) => `<label class="bot-check">
+              <input type="checkbox" name="botIds" value="${b.id}" ${selectedBotIds.includes(b.id) ? "checked" : ""} />
+              <span>${escapeHtml(b.name)}</span>
+            </label>`
+            )
+            .join("")}
+        </div>`;
 
   const leadRows =
     leads.length === 0
-      ? `<tr><td colspan="3" class="empty-cell">Nenhum lead nesta instância ainda. Quando alguém falar com o bot, aparece aqui.</td></tr>`
+      ? `<tr><td colspan="4" class="empty-cell">Nenhum lead nas instâncias selecionadas.</td></tr>`
       : leads
           .map((lead) => {
             const name = lead.displayName || lead.username || `Chat ${lead.chatId}`;
             const handle = lead.username ? `@${lead.username}` : `ID ${lead.chatId}`;
+            const botName = botNameById.get(lead.botId) || "Bot";
             return `<tr>
+            <td><span class="badge badge-online">${escapeHtml(botName)}</span></td>
             <td><strong>${escapeHtml(name)}</strong><br/><span class="muted-sm">${escapeHtml(handle)}</span></td>
             <td><code>${lead.chatId}</code></td>
             <td>
-              <textarea name="msg_${lead.chatId}" rows="2" class="remarketing-msg"
-                placeholder="Mensagem só para ${escapeHtml(name)}..."></textarea>
+              <textarea name="msg_${lead.botId}_${lead.chatId}" rows="2" class="remarketing-msg"
+                placeholder="Extra opcional para ${escapeHtml(name)}..."></textarea>
             </td>
           </tr>`;
           })
@@ -159,26 +173,33 @@ export function remarketingPage(
     ${message ? alertHtml(message, isError ? "error" : "success") : ""}
     <div class="page-hero neon-hero">
       <div>
-        <h2 class="hero-title"><span class="brand-accent">Remarketing</span> personalizado</h2>
-        <p class="hero-desc">Cada lead recebe uma mensagem <strong>diferente</strong>. Deixe em branco quem não deve receber nada.</p>
+        <h2 class="hero-title"><span class="brand-accent">Remarketing</span> multi-instância</h2>
+        <p class="hero-desc">Selecione várias instâncias, defina uma <strong>sequência de mensagens</strong> com delay e personalize por lead se quiser.</p>
       </div>
     </div>
     <form method="post" action="/remarketing" class="card card-neon">
-      <div class="card-head"><h3>${icons.megaphone} Campanha por lead</h3></div>
+      <div class="card-head"><h3>${icons.megaphone} Campanha</h3></div>
       <div class="card-body">
-        <label class="field">Instância
-          <select name="botId" required onchange="location.href='/remarketing?botId='+this.value">
-            ${botOptions}
-          </select>
+        <label class="field">Instâncias
+          ${botChecks}
         </label>
+        <div class="seq-block">
+          <h4 style="margin:16px 0 10px;font-size:0.9rem">Sequência de mensagens (todas as instâncias)</h4>
+          <label class="field">Mensagem 1<textarea name="seq_0" rows="2" class="remarketing-msg" placeholder="Oi amor, sumiu? 😘"></textarea></label>
+          <label class="field">Mensagem 2<textarea name="seq_1" rows="2" class="remarketing-msg" placeholder="Opcional — segunda mensagem"></textarea></label>
+          <label class="field">Mensagem 3<textarea name="seq_2" rows="2" class="remarketing-msg" placeholder="Opcional — terceira mensagem"></textarea></label>
+          <label class="field">Delay entre mensagens (segundos)
+            <input name="seqDelaySec" type="number" min="0" max="300" value="8" />
+          </label>
+        </div>
         <div class="table-scroll remarketing-table-wrap" role="region">
           <table class="table remarketing-table">
-            <thead><tr><th>Lead</th><th>Chat</th><th>Sua mensagem</th></tr></thead>
+            <thead><tr><th>Instância</th><th>Lead</th><th>Chat</th><th>Extra (opcional)</th></tr></thead>
             <tbody>${leadRows}</tbody>
           </table>
         </div>
-        <p class="form-hint">Pausa humana entre cada envio (delay da instância). Só leads com texto preenchido recebem mensagem.</p>
-        <button type="submit" class="btn btn-primary btn-block" ${bots.length === 0 || leads.length === 0 ? "disabled" : ""}>
+        <p class="form-hint">Sequência + mensagem extra por lead. Delay humano entre cada bolha da sequência.</p>
+        <button type="submit" class="btn btn-primary btn-block" ${bots.length === 0 ? "disabled" : ""}>
           Enviar remarketing
         </button>
       </div>

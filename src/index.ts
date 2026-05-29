@@ -11,7 +11,7 @@ import {
 } from "./bots.js";
 import { env } from "./config.js";
 import { initDatabase, useDatabase } from "./db/index.js";
-import { logMessage, logReceipt, logSale, setLeadSource, upsertLead } from "./db/events.js";
+import { logMessage, logReceipt, logSale, setLeadSource, upsertLead, listProducts } from "./db/events.js";
 import { detectSourceFromText, parseStartPayload } from "./lib/lead-source.js";
 import { decryptSecret } from "./lib/crypto.js";
 import { createLaranjinhaCharge } from "./lib/laranjinha.js";
@@ -50,6 +50,7 @@ import {
   negotiationReply,
   parseOfferReais
 } from "./lib/sales-packages.js";
+import { cantPayIntent, halfPriceOfferReply } from "./lib/product-offers.js";
 import { randomPreviewIntro } from "./lib/humanize.js";
 import { formatReceiptOutcome, randomReceiptAck } from "./lib/receipt-messages.js";
 import {
@@ -296,8 +297,20 @@ async function processReceiptFile(input: {
 
 async function startBot(config: BotConfig) {
   if (!config.active || !config.token) return;
+  try {
+    await launchBotInstance(config, config.token);
+  } catch (error) {
+    const backup = config.backupToken?.trim();
+    if (!backup) throw error;
+    console.warn(`[failover] ${config.name}: token principal falhou — ativando backup`);
+    await launchBotInstance(config, backup);
+  }
+}
 
-  const bot = new Telegraf(config.token);
+async function launchBotInstance(config: BotConfig, activeToken: string) {
+  if (!config.active || !activeToken) return;
+
+  const bot = new Telegraf(activeToken);
   const runtime: RuntimeBot = {
     config,
     bot,
@@ -455,6 +468,17 @@ async function startBot(config: BotConfig) {
     }
 
     const offer = parseOfferReais(text);
+    if (cantPayIntent(text)) {
+      const products = await listProducts(config.id);
+      const halfReply = halfPriceOfferReply(text, products, Boolean(leadState.offeredHalfPrice));
+      if (halfReply) {
+        leadState.offeredHalfPrice = true;
+        await humanSendText(ctx.telegram, chatId, config, halfReply);
+        history.push({ role: "user", content: text }, { role: "assistant", content: halfReply });
+        return;
+      }
+    }
+
     const negReply = negotiationReply({ text, selected: leadState.selectedPackage });
     if (negReply && offer !== null) {
       await humanSendText(ctx.telegram, chatId, config, negReply);

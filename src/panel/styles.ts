@@ -431,16 +431,30 @@ button, input, textarea, select { font-family: inherit; }
 }
 
 .bot-cell { display: flex; align-items: center; gap: 12px; min-width: 180px; }
+.bot-av-wrap {
+  position: relative;
+  width: 42px; height: 42px;
+  flex-shrink: 0;
+}
+.bot-av-img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  z-index: 2;
+  border: 2px solid rgba(10, 92, 255, 0.45);
+  box-shadow: 0 0 16px rgba(10, 92, 255, 0.25);
+}
+.bot-av-fallback { display: none !important; }
+.bot-av-fallback.show { display: grid !important; }
 .bot-av {
   width: 42px; height: 42px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary), #5ee4a8);
-  background-size: cover; background-position: center;
+  background: linear-gradient(135deg, var(--primary), #2b7bff);
   display: grid; place-items: center;
-  font-weight: 800; font-size: 0.78rem; color: #041018;
+  font-weight: 800; font-size: 0.78rem; color: #fff;
   flex-shrink: 0; overflow: hidden;
   border: 2px solid rgba(255, 255, 255, 0.12);
 }
-.bot-av.has-photo { color: transparent; }
 .bot-cell .title { font-weight: 700; font-size: 0.9rem; }
 .bot-cell .sub { font-size: 0.76rem; color: var(--muted); font-family: var(--font-mono); }
 

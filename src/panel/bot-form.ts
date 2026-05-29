@@ -2,7 +2,7 @@ import type { BotConfig } from "../bots.js";
 import { BYANCA_PROMPT_TELEGRAM } from "../lib/prompt-byanca.js";
 import { LEAD_SOURCES, sourceLabel, trackingLink } from "../lib/lead-source.js";
 import { icons } from "./icons.js";
-import { botHandle, botInitials, escapeHtml } from "./layout.js";
+import { botInitials, escapeHtml } from "./layout.js";
 
 function delayPartsFromMs(ms: number) {
   const totalSec = Math.max(1, Math.round(ms / 1000));
@@ -85,6 +85,10 @@ export function botInstanceForm(mode: "new" | "edit", bot?: BotConfig) {
         <label class="field span-2">Token Telegram
           <input name="token" ${isEdit ? "" : "required"} autocomplete="off"
             placeholder="${isEdit ? "Deixe vazio para manter o token atual" : "123456789:ABC..."}" />
+        </label>
+        <label class="field span-2">Token backup <small style="color:var(--muted)">failover se o principal cair</small>
+          <input name="backupToken" autocomplete="off" value="${isEdit && bot.backupToken ? escapeHtml(bot.backupToken) : ""}"
+            placeholder="${isEdit ? "Deixe vazio para manter" : "Token do bot reserva (opcional)"}" />
         </label>
         <label class="field span-2">Foto de perfil do bot
           <div class="dropzone">
@@ -228,7 +232,7 @@ export function instancesTableHtml(bots: BotConfig[]) {
             ${botAvatarHtml(bot)}
             <div>
               <div class="title">${escapeHtml(bot.name)}</div>
-              <div class="sub">${escapeHtml(botHandle(bot.name))}</div>
+              <div class="sub">Telegram bot</div>
             </div>
           </div>
         </td>

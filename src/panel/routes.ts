@@ -23,8 +23,8 @@ import {
   salesRankingByBot,
   saveProduct
 } from "../db/events.js";
-import { deleteBot, getBotById, loadBots, upsertBot, uploadsDir, type NamedAudio } from "../bots.js";
-import { sendRemarketing } from "../lib/remarketing.js";
+import { deleteBot, getBotById, loadBots, upsertBot, uploadsDir, type BotConfig, type NamedAudio } from "../bots.js";
+import { sendRemarketingMulti } from "../lib/remarketing.js";
 import { authenticateUser, createUser } from "../db/users.js";
 import { encryptSecret } from "../lib/crypto.js";
 import {
@@ -156,6 +156,7 @@ const botFormFieldsSchema = z.object({
   active: z.enum(["true", "false"]).default("true"),
   paymentMethod: z.enum(["pix", "laranjinha"]).default("pix"),
   laranjinhaApiKey: z.string().optional(),
+  backupToken: z.string().optional(),
   productName: z.string().default("VIP"),
   productPrice: z.coerce.number().default(97),
   telegramGroupLink: z.string().default("")
@@ -226,9 +227,13 @@ export async function registerPanelRoutes(
         .object({
           name: z.string().min(2),
           email: z.string().email(),
-          password: z.string().min(6)
+          password: z.string().min(6),
+          inviteCode: z.string().optional()
         })
         .parse(request.body);
+      if (body.inviteCode?.trim() !== env.INVITE_CODE) {
+        throw new Error("Codigo de convite invalido.");
+      }
       const user = await createUser(body);
       setSessionCookie(reply, user);
       return reply.redirect("/");
@@ -389,17 +394,18 @@ export async function registerPanelRoutes(
     if (!user) return;
     const query = z
       .object({
-        botId: z.string().optional(),
+        botIds: z.string().optional(),
         msg: z.string().optional(),
         t: z.string().optional()
       })
       .parse(request.query);
     const bots = await loadBots(user.id);
-    const botId = query.botId || bots[0]?.id || "";
-    const bot = botId ? await getBotById(botId, user.id) : null;
-    const { listLeadsByBot } = await import("../db/events.js");
-    const leads = bot ? await listLeadsByBot(bot.id) : [];
-    const html = remarketingPage(bots, botId, leads, query.msg, query.t === "err", isPartial(request));
+    const selectedBotIds = query.botIds
+      ? query.botIds.split(",").filter(Boolean)
+      : bots.map((b) => b.id);
+    const { listLeadsByBots } = await import("../db/events.js");
+    const leads = selectedBotIds.length ? await listLeadsByBots(selectedBotIds) : [];
+    const html = remarketingPage(bots, selectedBotIds, leads, query.msg, query.t === "err", isPartial(request));
     return reply.type("text/html").send(html);
   });
 
@@ -407,34 +413,62 @@ export async function registerPanelRoutes(
     const user = requireUser(request, reply);
     if (!user) return;
     try {
-      const raw = (request.body ?? {}) as Record<string, string>;
-      const botId = raw.botId?.trim();
-      if (!botId) throw new Error("Escolha uma instância.");
+      const raw = (request.body ?? {}) as Record<string, string | string[]>;
+      const botIdsRaw = raw.botIds;
+      const botIds = (Array.isArray(botIdsRaw) ? botIdsRaw : botIdsRaw ? [botIdsRaw] : [])
+        .map(String)
+        .filter(Boolean);
+      if (botIds.length === 0) throw new Error("Selecione ao menos uma instância.");
 
-      const bot = await getBotById(botId, user.id);
-      if (!bot) return reply.redirect(flashRedirect("/remarketing", "Instância não encontrada.", "err"));
-      if (!bot.active) {
-        return reply.redirect(flashRedirect("/remarketing", "Ative a instância antes de enviar.", "err"));
+      const sequence = [raw.seq_0, raw.seq_1, raw.seq_2]
+        .flat()
+        .map((v) => String(v || "").trim())
+        .filter(Boolean);
+      const seqDelayMs = Math.max(0, Number(String(raw.seqDelaySec ?? "8")) * 1000);
+
+      const activeBots: BotConfig[] = [];
+      const messagesByBot = new Map<string, { chatId: number; message: string }[]>();
+
+      for (const botId of botIds) {
+        const bot = await getBotById(botId, user.id);
+        if (!bot) continue;
+        if (!bot.active) {
+          return reply.redirect(flashRedirect("/remarketing", `Instância ${bot.name} está pausada.`, "err"));
+        }
+        activeBots.push(bot);
+        const messages = Object.entries(raw)
+          .filter(([key]) => key.startsWith(`msg_${botId}_`))
+          .map(([key, value]) => ({
+            chatId: Number(key.slice(`msg_${botId}_`.length)),
+            message: String(Array.isArray(value) ? value[0] : value || "").trim()
+          }))
+          .filter((m) => Number.isFinite(m.chatId) && m.message.length > 0);
+        messagesByBot.set(botId, messages);
       }
 
-      const messages = Object.entries(raw)
-        .filter(([key]) => key.startsWith("msg_"))
-        .map(([key, value]) => ({
-          chatId: Number(key.slice(4)),
-          message: String(value || "").trim()
-        }))
-        .filter((m) => Number.isFinite(m.chatId) && m.message.length > 0);
-
-      if (messages.length === 0) {
-        return reply.redirect(
-          flashRedirect("/remarketing?botId=" + botId, "Preencha ao menos uma mensagem para um lead.", "err")
-        );
+      if (activeBots.length === 0) {
+        return reply.redirect(flashRedirect("/remarketing", "Nenhuma instância válida.", "err"));
       }
 
-      const result = await sendRemarketing({ config: bot, messages });
+      if (sequence.length === 0) {
+        const anyPersonal = [...messagesByBot.values()].some((m) => m.length > 0);
+        if (!anyPersonal) {
+          return reply.redirect(
+            flashRedirect("/remarketing", "Preencha a sequência ou mensagens por lead.", "err")
+          );
+        }
+      }
+
+      const result = await sendRemarketingMulti({
+        bots: activeBots,
+        messagesByBot,
+        sequence,
+        sequenceDelayMs: seqDelayMs
+      });
+      const ids = botIds.join(",");
       return reply.redirect(
         flashRedirect(
-          `/remarketing?botId=${botId}`,
+          `/remarketing?botIds=${ids}`,
           `Remarketing: ${result.sent} enviada(s), ${result.failed} falha(s), ${result.skipped} sem mensagem, de ${result.total} lead(s).`
         )
       );
@@ -505,13 +539,17 @@ export async function registerPanelRoutes(
         .object({
           botId: z.string().min(1),
           name: z.string().min(1),
-          price: z.coerce.number().min(1)
+          price: z.coerce.number().min(1),
+          allowHalfPrice: z.string().optional(),
+          halfPricePercent: z.coerce.number().min(10).max(90).optional()
         })
         .parse(request.body);
       await saveProduct({
         botId: body.botId,
         name: body.name,
-        priceCents: Math.round(body.price * 100)
+        priceCents: Math.round(body.price * 100),
+        allowHalfPrice: body.allowHalfPrice === "true",
+        halfPricePercent: body.halfPricePercent ?? 50
       });
       return reply.redirect(flashRedirect("/products", "Produto salvo!"));
     } catch (error) {
@@ -593,7 +631,8 @@ export async function registerPanelRoutes(
           : existing.laranjinhaApiKeyEncrypted,
         productName: body.productName,
         productPriceCents: Math.round(body.productPrice * 100),
-        telegramGroupLink: ""
+        telegramGroupLink: "",
+        backupToken: body.backupToken?.trim() || existing.backupToken
       });
 
       hooks.restartBots();
@@ -693,7 +732,8 @@ export async function registerPanelRoutes(
           : undefined,
         productName: body.productName,
         productPriceCents: Math.round(body.productPrice * 100),
-        telegramGroupLink: ""
+        telegramGroupLink: "",
+        backupToken: body.backupToken?.trim() || undefined
       });
 
       hooks.restartBots();

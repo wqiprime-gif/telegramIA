@@ -10,6 +10,7 @@ export type LeadState = {
   coldStrike: number;
   paid: boolean;
   selectedPackage?: PackageId;
+  offeredHalfPrice?: boolean;
 };
 
 export function createLeadState(): LeadState {

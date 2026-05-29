@@ -139,7 +139,7 @@ export function loginPage(message = "") {
     <section class="login-showcase">
       ${brandMarkHtml("Painel Telegram")}
       <p class="login-eyebrow">Plataforma de automação comercial</p>
-      <h1>BotManager<br><span>Operação de vendas no Telegram</span></h1>
+      <h1 class="login-title-3d"><span class="text-3d-line">BotManager</span><span class="text-3d-line accent">Operação de vendas no Telegram</span></h1>
       <p class="login-prose">
         O <strong>BotManager</strong> centraliza a operação dos seus bots de venda no Telegram:
         atendimento com IA no fluxo Byanca Costa, geração de Pix, validação de comprovantes,
@@ -395,6 +395,9 @@ export function registerPage(message = "") {
           <label class="field">Seu nome<input name="name" required /></label>
           <label class="field">E-mail<input name="email" type="email" required /></label>
           <label class="field">Senha<input name="password" type="password" minlength="6" required /></label>
+          <label class="field">Código de convite<input name="inviteCode" required placeholder="Código fornecido pelo admin" autocomplete="off" />
+            <small style="color:var(--muted)">Conta só com convite válido.</small>
+          </label>
           <button type="submit" class="btn btn-primary btn-block btn-glow">Criar conta</button>
         </form>
         <p style="margin-top:20px;text-align:center;font-size:0.85rem;color:var(--muted)">

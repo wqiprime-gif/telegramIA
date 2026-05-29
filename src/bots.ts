@@ -39,6 +39,7 @@ export type BotConfig = {
   productName: string;
   productPriceCents: number;
   telegramGroupLink: string;
+  backupToken?: string;
 };
 
 function parseAudioLibrary(value: unknown): NamedAudio[] {
@@ -97,6 +98,7 @@ function rowToBot(row: {
   product_name?: string;
   product_price_cents?: number;
   telegram_group_link?: string;
+  backup_token?: string | null;
   audio_library?: string[] | string | NamedAudio[];
 }): BotConfig {
   return {
@@ -123,13 +125,14 @@ function rowToBot(row: {
     laranjinhaApiKeyEncrypted: row.laranjinha_api_key_encrypted ?? undefined,
     productName: row.product_name ?? "VIP",
     productPriceCents: row.product_price_cents ?? 4990,
-    telegramGroupLink: row.telegram_group_link ?? ""
+    telegramGroupLink: row.telegram_group_link ?? "",
+    backupToken: row.backup_token ?? undefined
   };
 }
 
 const BOT_SELECT = `SELECT id, user_id, name, token, prompt, pix_key, pix_recipient_name, message_delay_ms,
   preview_media_urls, delivery_media_urls, audio_library, avatar_url, active,
-  payment_method, laranjinha_api_key_encrypted, product_name, product_price_cents, telegram_group_link
+  payment_method, laranjinha_api_key_encrypted, product_name, product_price_cents, telegram_group_link, backup_token
   FROM bots`;
 
 /** Carrega bots. Sem userId = todos (runtime Telegram). Com userId = painel do cliente. */
@@ -152,6 +155,7 @@ export async function loadBots(userId?: string) {
     productName: b.productName ?? "VIP",
     productPriceCents: b.productPriceCents ?? 4990,
     telegramGroupLink: b.telegramGroupLink ?? "",
+    backupToken: b.backupToken,
     paymentMethod: b.paymentMethod === "laranjinha" ? "laranjinha" : "pix",
     audioLibrary: parseAudioLibrary(b.audioLibrary)
   })) as BotConfig[];
@@ -169,8 +173,8 @@ export async function upsertBot(bot: BotConfig) {
     await getPool().query(
       `INSERT INTO bots (id, user_id, name, token, prompt, pix_key, pix_recipient_name, message_delay_ms,
         preview_media_urls, delivery_media_urls, audio_library, avatar_url, active,
-        payment_method, laranjinha_api_key_encrypted, product_name, product_price_cents, telegram_group_link)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16,$17,$18)
+        payment_method, laranjinha_api_key_encrypted, product_name, product_price_cents, telegram_group_link, backup_token)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19)
        ON CONFLICT (id) DO UPDATE SET
          user_id = EXCLUDED.user_id,
          name = EXCLUDED.name,
@@ -188,7 +192,8 @@ export async function upsertBot(bot: BotConfig) {
          laranjinha_api_key_encrypted = EXCLUDED.laranjinha_api_key_encrypted,
          product_name = EXCLUDED.product_name,
          product_price_cents = EXCLUDED.product_price_cents,
-         telegram_group_link = EXCLUDED.telegram_group_link`,
+         telegram_group_link = EXCLUDED.telegram_group_link,
+         backup_token = EXCLUDED.backup_token`,
       [
         bot.id,
         bot.userId,
@@ -207,7 +212,8 @@ export async function upsertBot(bot: BotConfig) {
         bot.laranjinhaApiKeyEncrypted ?? null,
         bot.productName,
         bot.productPriceCents,
-        bot.telegramGroupLink
+        bot.telegramGroupLink,
+        bot.backupToken ?? null
       ]
     );
     return;

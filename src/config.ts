@@ -19,6 +19,7 @@ const envSchema = z.object({
   PANEL_PASSWORD: z.string().min(6).default("troque-essa-senha"),
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_NAME: z.string().default("Administrador"),
+  INVITE_CODE: z.string().default("BOT2026"),
   SESSION_SECRET: z.string().min(16).optional(),
   PORT: z.coerce.number().default(3000),
   TELEGRAM_BOT_TOKEN: z.string().default(""),

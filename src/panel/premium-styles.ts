@@ -88,6 +88,52 @@ export const premiumStyles = `
   color: #fff;
   margin-bottom: 24px;
 }
+.login-showcase h1.login-title-3d {
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 4.5vw, 3.2rem);
+  font-weight: 800; line-height: 1.08;
+  letter-spacing: -0.04em;
+  color: #fff;
+  margin-bottom: 24px;
+}
+.text-3d-line {
+  display: block;
+  transform: perspective(800px) rotateX(8deg);
+  transform-origin: left center;
+  text-shadow:
+    0 1px 0 #1a3a8a,
+    0 2px 0 #153070,
+    0 3px 0 #102860,
+    0 4px 0 #0b2048,
+    0 8px 16px rgba(0, 0, 0, 0.55),
+    0 0 40px rgba(10, 92, 255, 0.35);
+  animation: text3d-float 4s ease-in-out infinite;
+}
+.text-3d-line.accent {
+  color: var(--blue-bright);
+  text-shadow:
+    0 1px 0 #0a3080,
+    0 2px 0 #082868,
+    0 3px 0 #062050,
+    0 4px 0 #041838,
+    0 8px 20px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(10, 92, 255, 0.55);
+}
+@keyframes text3d-float {
+  0%, 100% { transform: perspective(800px) rotateX(8deg) translateY(0); }
+  50% { transform: perspective(800px) rotateX(6deg) translateY(-4px); }
+}
+
+.bot-check-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.bot-check {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: 10px;
+  background: rgba(10, 92, 255, 0.08);
+  border: 1px solid rgba(10, 92, 255, 0.22);
+  font-size: 0.85rem; cursor: pointer;
+}
+.bot-check input { width: auto; accent-color: var(--blue); }
+
 .login-showcase h1 span {
   color: var(--blue-bright);
   text-shadow: 0 0 60px var(--blue-glow);

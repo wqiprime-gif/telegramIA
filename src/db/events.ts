@@ -63,7 +63,10 @@ export type Product = {
   name: string;
   priceCents: number;
   active: boolean;
+  allowHalfPrice: boolean;
+  halfPricePercent: number;
   createdAt: string;
+  botName?: string;
 };
 
 const emptyStore = (): Store => ({
@@ -144,14 +147,20 @@ export async function initEventsSchema() {
       name TEXT NOT NULL,
       price_cents INTEGER NOT NULL,
       active BOOLEAN NOT NULL DEFAULT true,
+      allow_half_price BOOLEAN NOT NULL DEFAULT false,
+      half_price_percent INTEGER NOT NULL DEFAULT 50,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS allow_half_price BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS half_price_percent INTEGER NOT NULL DEFAULT 50;
 
     ALTER TABLE bots ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'pix';
     ALTER TABLE bots ADD COLUMN IF NOT EXISTS laranjinha_api_key_encrypted TEXT;
     ALTER TABLE bots ADD COLUMN IF NOT EXISTS product_name TEXT NOT NULL DEFAULT 'VIP';
     ALTER TABLE bots ADD COLUMN IF NOT EXISTS product_price_cents INTEGER NOT NULL DEFAULT 4990;
     ALTER TABLE bots ADD COLUMN IF NOT EXISTS telegram_group_link TEXT NOT NULL DEFAULT '';
+    ALTER TABLE bots ADD COLUMN IF NOT EXISTS backup_token TEXT;
   `);
 }
 
@@ -345,6 +354,34 @@ export async function logSale(input: {
     createdAt: new Date().toISOString()
   });
   await saveFileStore(store);
+}
+
+export async function listLeadsByBots(botIds: string[]) {
+  if (botIds.length === 0) return [];
+  if (useDatabase()) {
+    const { rows } = await getPool().query(
+      `SELECT bot_id, chat_id, username, display_name FROM leads
+       WHERE bot_id = ANY($1::uuid[]) ORDER BY last_message_at DESC`,
+      [botIds]
+    );
+    return rows.map((r) => ({
+      botId: String(r.bot_id),
+      chatId: Number(r.chat_id),
+      username: r.username as string | undefined,
+      displayName: r.display_name as string | undefined
+    }));
+  }
+
+  const store = await loadFileStore();
+  const set = new Set(botIds);
+  return store.leads
+    .filter((l) => set.has(l.botId))
+    .map((l) => ({
+      botId: l.botId,
+      chatId: l.chatId,
+      username: l.username,
+      displayName: l.displayName
+    }));
 }
 
 export async function listLeadsByBot(botId: string) {
@@ -909,7 +946,7 @@ export async function dashboardStats(userId?: string) {
   };
 }
 
-export async function listProducts(botId?: string) {
+export async function listProducts(botId?: string): Promise<Product[]> {
   if (useDatabase()) {
     const { rows } = botId
       ? await getPool().query(
@@ -920,17 +957,46 @@ export async function listProducts(botId?: string) {
       : await getPool().query(
           `SELECT p.*, b.name AS bot_name FROM products p LEFT JOIN bots b ON b.id = p.bot_id ORDER BY p.created_at DESC`
         );
-    return rows;
+    return rows.map((r) => ({
+      ...rowToProduct(r as Record<string, unknown>),
+      botName: r.bot_name ? String(r.bot_name) : undefined
+    }));
   }
   const store = await loadFileStore();
-  return botId ? store.products.filter((p) => p.botId === botId) : store.products;
+  const list = botId ? store.products.filter((p) => p.botId === botId) : store.products;
+  return list.map((p) => ({
+    ...p,
+    allowHalfPrice: p.allowHalfPrice ?? false,
+    halfPricePercent: p.halfPricePercent ?? 50
+  }));
 }
 
-export async function saveProduct(input: { botId: string; name: string; priceCents: number }) {
+function rowToProduct(row: Record<string, unknown>): Product {
+  return {
+    id: String(row.id),
+    botId: String(row.bot_id ?? row.botId),
+    name: String(row.name),
+    priceCents: Number(row.price_cents ?? row.priceCents),
+    active: row.active !== false,
+    allowHalfPrice: Boolean(row.allow_half_price ?? row.allowHalfPrice),
+    halfPricePercent: Number(row.half_price_percent ?? row.halfPricePercent ?? 50),
+    createdAt: String(row.created_at ?? row.createdAt ?? new Date().toISOString())
+  };
+}
+
+export async function saveProduct(input: {
+  botId: string;
+  name: string;
+  priceCents: number;
+  allowHalfPrice?: boolean;
+  halfPricePercent?: number;
+}) {
+  const allowHalf = input.allowHalfPrice ?? false;
+  const halfPct = input.halfPricePercent ?? 50;
   if (useDatabase()) {
     await getPool().query(
-      `INSERT INTO products (bot_id, name, price_cents) VALUES ($1,$2,$3)`,
-      [input.botId, input.name, input.priceCents]
+      `INSERT INTO products (bot_id, name, price_cents, allow_half_price, half_price_percent) VALUES ($1,$2,$3,$4,$5)`,
+      [input.botId, input.name, input.priceCents, allowHalf, halfPct]
     );
     return;
   }
@@ -941,6 +1007,8 @@ export async function saveProduct(input: { botId: string; name: string; priceCen
     name: input.name,
     priceCents: input.priceCents,
     active: true,
+    allowHalfPrice: allowHalf,
+    halfPricePercent: halfPct,
     createdAt: new Date().toISOString()
   });
   await saveFileStore(store);
