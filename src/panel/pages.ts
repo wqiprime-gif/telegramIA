@@ -1,4 +1,5 @@
 import type { BotConfig } from "../bots.js";
+import type { ScheduledCampaign } from "../lib/scheduled-campaigns.js";
 import { sourceEmoji, sourceLabel } from "../lib/lead-source.js";
 import { alertHtml, appLayout, escapeHtml, type NavId } from "./layout.js";
 import { icons } from "./icons.js";
@@ -164,14 +165,35 @@ function remarketingBlocksScript() {
     e.preventDefault();
     document.querySelectorAll('input[name="botIds"]').forEach(function(c){ c.checked = false; });
   });
+  var modeNow = document.getElementById("send-mode-now");
+  var modeSched = document.getElementById("send-mode-schedule");
+  var schedWrap = document.getElementById("schedule-at-wrap");
+  var submitBtn = document.getElementById("rmk-submit-btn");
+  function syncSchedule(){
+    var sched = modeSched && modeSched.checked;
+    if (schedWrap) schedWrap.style.display = sched ? "block" : "none";
+    if (submitBtn) submitBtn.textContent = sched ? "Agendar disparo" : "Enviar agora";
+  }
+  modeNow?.addEventListener("change", syncSchedule);
+  modeSched?.addEventListener("change", syncSchedule);
+  syncSchedule();
 })();
 `.trim();
+}
+
+function formatScheduleBr(iso: string) {
+  try {
+    return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return iso;
+  }
 }
 
 export function remarketingPage(
   bots: BotConfig[],
   selectedBotIds: string[],
   leads: { botId: string; chatId: number; username?: string; displayName?: string }[],
+  scheduled: ScheduledCampaign[] = [],
   message = "",
   isError = false,
   partial?: boolean
@@ -215,6 +237,37 @@ export function remarketingPage(
           </tr>`;
           })
           .join("");
+
+  const scheduledRows =
+    scheduled.length === 0
+      ? `<p class="form-hint">Nenhum disparo agendado.</p>`
+      : `<table class="table"><thead><tr><th>Quando</th><th>Status</th><th>Instâncias</th><th></th></tr></thead><tbody>
+      ${scheduled
+        .map((c) => {
+          const statusLabel =
+            c.status === "pending"
+              ? "Aguardando"
+              : c.status === "done"
+                ? "Enviado"
+                : c.status === "running"
+                  ? "Enviando..."
+                  : "Falhou";
+          const cancel =
+            c.status === "pending"
+              ? `<form method="post" action="/remarketing/cancel" style="display:inline">
+              <input type="hidden" name="id" value="${c.id}" />
+              <button type="submit" class="btn btn-secondary btn-sm">Cancelar</button>
+            </form>`
+              : `<span class="muted-sm">${escapeHtml(c.resultSummary ?? "—")}</span>`;
+          return `<tr>
+            <td>${formatScheduleBr(c.scheduledAt)}</td>
+            <td><span class="badge badge-online">${statusLabel}</span></td>
+            <td>${c.botIds.length} bot(s) · ${c.sequence.length} msg(s)</td>
+            <td>${cancel}</td>
+          </tr>`;
+        })
+        .join("")}
+      </tbody></table>`;
 
   const body = `
     ${message ? alertHtml(message, isError ? "error" : "success") : ""}
@@ -262,11 +315,27 @@ export function remarketingPage(
         </details>`
             : `<p class="form-hint">Selecione instâncias e clique em &quot;Aplicar seleção&quot; para ver leads e personalizar.</p>`
         }
-        <button type="submit" class="btn btn-primary btn-block" ${bots.length === 0 ? "disabled" : ""}>
-          Enviar remarketing
+        <div class="schedule-block">
+          <h4 style="margin:20px 0 10px;font-size:0.9rem">Quando disparar?</h4>
+          <div class="schedule-mode-row">
+            <label class="bot-check"><input type="radio" name="sendMode" id="send-mode-now" value="now" checked /> Enviar agora</label>
+            <label class="bot-check"><input type="radio" name="sendMode" id="send-mode-schedule" value="schedule" /> Agendar</label>
+          </div>
+          <label class="field" id="schedule-at-wrap" style="display:none;margin-top:12px">
+            Data e hora do disparo
+            <input type="datetime-local" name="scheduledAt" />
+          </label>
+          <p class="form-hint">No agendamento, a sequência será enviada automaticamente na data escolhida.</p>
+        </div>
+        <button type="submit" id="rmk-submit-btn" class="btn btn-primary btn-block" ${bots.length === 0 ? "disabled" : ""}>
+          Enviar agora
         </button>
       </div>
     </form>
+    <div class="card card-neon" style="margin-top:16px">
+      <div class="card-head"><h3>${icons.doc} Agendamentos</h3></div>
+      <div class="card-body">${scheduledRows}</div>
+    </div>
     <script>${remarketingBlocksScript()}</script>`;
 
   return wrap("Remarketing", "remarketing", body, partial);

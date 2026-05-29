@@ -442,8 +442,18 @@ export async function registerPanelRoutes(
         ? query.botIds.split(",").filter(Boolean)
         : [];
     const { listLeadsByBots } = await import("../db/events.js");
+    const { listScheduledCampaigns } = await import("../lib/scheduled-campaigns.js");
     const leads = selectedBotIds.length ? await listLeadsByBots(selectedBotIds) : [];
-    const html = remarketingPage(bots, selectedBotIds, leads, query.msg, query.t === "err", isPartial(request));
+    const scheduled = await listScheduledCampaigns(user.id);
+    const html = remarketingPage(
+      bots,
+      selectedBotIds,
+      leads,
+      scheduled,
+      query.msg,
+      query.t === "err",
+      isPartial(request)
+    );
     return reply.type("text/html").send(html);
   });
 
@@ -499,13 +509,50 @@ export async function registerPanelRoutes(
         }
       }
 
+      const sendMode = String(raw.sendMode || "now");
+      const ids = botIds.join(",");
+      const messagesByBotObj: Record<string, { chatId: number; message: string }[]> = {};
+      for (const [botId, msgs] of messagesByBot.entries()) {
+        messagesByBotObj[botId] = msgs;
+      }
+
+      if (sendMode === "schedule") {
+        const scheduledAtRaw = String(raw.scheduledAt || "").trim();
+        if (!scheduledAtRaw) {
+          return reply.redirect(flashRedirect("/remarketing?botIds=" + ids, "Informe data e hora do agendamento.", "err"));
+        }
+        const scheduledAt = new Date(scheduledAtRaw);
+        if (Number.isNaN(scheduledAt.getTime())) {
+          return reply.redirect(flashRedirect("/remarketing?botIds=" + ids, "Data/hora inválida.", "err"));
+        }
+        if (scheduledAt.getTime() <= Date.now() + 30_000) {
+          return reply.redirect(
+            flashRedirect("/remarketing?botIds=" + ids, "Agende para pelo menos 1 minuto no futuro.", "err")
+          );
+        }
+        const { createScheduledCampaign } = await import("../lib/scheduled-campaigns.js");
+        await createScheduledCampaign({
+          userId: user.id,
+          botIds,
+          sequence,
+          sequenceDelayMs: seqDelayMs,
+          messagesByBot: messagesByBotObj,
+          scheduledAt: scheduledAt.toISOString()
+        });
+        return reply.redirect(
+          flashRedirect(
+            `/remarketing?botIds=${ids}`,
+            `Campanha agendada para ${scheduledAt.toLocaleString("pt-BR")}.`
+          )
+        );
+      }
+
       const result = await sendRemarketingMulti({
         bots: activeBots,
         messagesByBot,
         sequence,
         sequenceDelayMs: seqDelayMs
       });
-      const ids = botIds.join(",");
       return reply.redirect(
         flashRedirect(
           `/remarketing?botIds=${ids}`,
@@ -516,6 +563,18 @@ export async function registerPanelRoutes(
       request.log.error(error);
       return reply.redirect(flashRedirect("/remarketing", `Erro: ${errorMessage(error)}`, "err"));
     }
+  });
+
+  app.post("/remarketing/cancel", async (request, reply) => {
+    const user = requireUser(request, reply);
+    if (!user) return;
+    const raw = (request.body ?? {}) as { id?: string };
+    const id = String(raw.id || "").trim();
+    if (id) {
+      const { cancelScheduledCampaign } = await import("../lib/scheduled-campaigns.js");
+      await cancelScheduledCampaign(id, user.id);
+    }
+    return reply.redirect(flashRedirect("/remarketing", "Agendamento cancelado."));
   });
 
   app.get("/api/panel/conversations/threads", async (request, reply) => {

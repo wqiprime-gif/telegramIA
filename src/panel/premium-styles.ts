@@ -156,6 +156,12 @@ export const premiumStyles = `
 @media (min-width: 720px) {
   .gift-add-row { grid-template-columns: 1fr 1.4fr auto; align-items: end; }
 }
+.gift-prompt-field { min-height: 120px; font-size: 0.95rem; line-height: 1.55; }
+.schedule-block {
+  margin-top: 8px; padding-top: 12px;
+  border-top: 1px solid rgba(10,92,255,0.15);
+}
+.schedule-mode-row { display: flex; flex-wrap: wrap; gap: 10px; }
 
 .login-showcase h1 span {
   color: var(--blue-bright);
@@ -418,6 +424,10 @@ export const premiumStyles = `
 .tg-threads-hint { color: var(--blue-bright) !important; }
 
 /* Lightning login */
+#login-particles-canvas {
+  position: fixed; inset: 0; z-index: 2; pointer-events: none;
+  width: 100%; height: 100%;
+}
 #login-lightning-canvas {
   position: fixed; inset: 0; width: 100%; height: 100%;
   z-index: 2; pointer-events: none;

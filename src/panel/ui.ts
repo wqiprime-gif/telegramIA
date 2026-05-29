@@ -8,6 +8,7 @@ import { salesChartSvgFromData, messagesChartSvgFromData, leadSourcesBarSvg } fr
 import { globalStyles } from "./styles.js";
 import { panelSceneScript } from "./panel-scene.js";
 import { loginLightningScript } from "./panel-lightning.js";
+import { loginParticlesScript } from "./panel-auth-particles.js";
 import { AI_PROVIDERS, type AIProviderId } from "../lib/ai-providers.js";
 import type { LeadSourceStat } from "../db/events.js";
 import { sourceEmoji, sourceLabel } from "../lib/lead-source.js";
@@ -133,6 +134,7 @@ export function loginPage(message = "") {
 <body class="auth-body">
   <div class="light-rays" aria-hidden="true"></div>
   <canvas id="login-lightning-canvas" aria-hidden="true"></canvas>
+  <canvas id="login-particles-canvas" aria-hidden="true"></canvas>
   <canvas id="panel-scene-canvas" aria-hidden="true"></canvas>
   <div class="mesh-blob" aria-hidden="true"></div>
   <main class="login-premium">
@@ -174,6 +176,7 @@ export function loginPage(message = "") {
     </section>
   </main>
   <script>${panelSceneScript("auth")}</script>
+  <script>${loginParticlesScript()}</script>
   <script>${loginLightningScript()}</script>
 </body>
 </html>`;
@@ -372,6 +375,7 @@ export function registerPage(message = "") {
 <body class="auth-body">
   <div class="light-rays" aria-hidden="true"></div>
   <canvas id="login-lightning-canvas" aria-hidden="true"></canvas>
+  <canvas id="login-particles-canvas" aria-hidden="true"></canvas>
   <canvas id="panel-scene-canvas" aria-hidden="true"></canvas>
   <div class="mesh-blob" aria-hidden="true"></div>
   <main class="login-premium">
@@ -406,6 +410,7 @@ export function registerPage(message = "") {
     </section>
   </main>
   <script>${panelSceneScript("auth")}</script>
+  <script>${loginParticlesScript()}</script>
   <script>${loginLightningScript()}</script>
 </body>
 </html>`;

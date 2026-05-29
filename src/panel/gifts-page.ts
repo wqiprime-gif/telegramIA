@@ -45,10 +45,11 @@ export function giftsPage(
 ) {
   const bot = bots.find((b) => b.id === selectedBotId) ?? bots[0];
   const items = bot?.giftItems ?? [];
+  const canSave = Boolean(bot);
 
   const botOptions =
     bots.length === 0
-      ? `<option value="">Cadastre uma instância</option>`
+      ? `<option value="">— Crie uma instância primeiro —</option>`
       : bots
           .map(
             (b) =>
@@ -57,9 +58,11 @@ export function giftsPage(
           .join("");
 
   const list =
-    items.length === 0
-      ? `<div class="empty glow-empty">Nenhum presente cadastrado. Adicione abaixo o que a IA pode pedir ao lead.</div>`
-      : `<div class="gift-grid">
+    !bot
+      ? `<p class="form-hint">Selecione ou crie uma instância acima para ver os presentes salvos.</p>`
+      : items.length === 0
+        ? `<div class="empty glow-empty">Nenhum presente cadastrado. Use o botão abaixo para adicionar.</div>`
+        : `<div class="gift-grid">
       ${items
         .map((item, i) => {
           const slug = item.slug || giftSlugFromName(item.name);
@@ -83,7 +86,7 @@ export function giftsPage(
     <div class="page-hero neon-hero">
       <div>
         <h2 class="hero-title"><span class="brand-accent">Pedir presentes</span></h2>
-        <p class="hero-desc">Configure quando e como a IA pede mimos. Cadastre os presentes e use <code>[[pedir_presente]]</code> no prompt da instância.</p>
+        <p class="hero-desc">Defina o <strong>prompt</strong> de quando pedir mimos e cadastre os presentes. No prompt da instância use <code>[[pedir_presente]]</code>.</p>
       </div>
     </div>
     <div class="card card-neon">
@@ -94,50 +97,60 @@ export function giftsPage(
             <select name="botId" onchange="this.form.submit()">${botOptions}</select>
           </label>
         </form>
+        ${bots.length === 0 ? `<p class="form-hint" style="margin-top:12px"><a href="/instances/new">+ Criar primeira instância</a></p>` : ""}
       </div>
     </div>
-    ${
-      bot
-        ? `
-    ${list}
+
     <div class="card card-neon" style="margin-top:16px">
-      <div class="card-head"><h3>${icons.sparkles} Prompt de presentes</h3></div>
+      <div class="card-head"><h3>${icons.doc} Prompt da IA</h3></div>
       <div class="card-body">
         <form id="gift-save-form" method="post" action="/gifts">
-          <input type="hidden" name="botId" value="${bot.id}" />
-          <label class="field">Quando pedir presente (instrução para a IA)
-            <textarea name="giftPrompt" rows="4" placeholder="Ex: depois que o lead elogiar ou demonstrar carinho, peça um mimo com leveza. Não peça na primeira mensagem.">${escapeHtml(bot.giftPrompt ?? "")}</textarea>
+          <input type="hidden" name="botId" value="${bot?.id ?? ""}" />
+          <label class="field">Instruções — quando e como pedir presente
+            <textarea name="giftPrompt" rows="5" class="gift-prompt-field" placeholder="Ex: Depois que o lead elogiar, demonstrar carinho ou perguntar como ajudar, peça um mimo com leveza. Nunca na primeira mensagem. Use [[pedir_presente]] na resposta." ${canSave ? "" : "disabled"}>${escapeHtml(bot?.giftPrompt ?? "")}</textarea>
           </label>
-          <div id="gift-new-blocks" class="seq-block"></div>
-          <button type="button" class="btn btn-secondary btn-sm" id="gift-add-btn" style="margin:12px 0">${icons.plus} Adicionar presente</button>
-          <button type="submit" class="btn btn-primary">Salvar configuração</button>
+          <p class="form-hint">Este texto entra no contexto da IA junto com os presentes cadastrados abaixo.</p>
         </form>
       </div>
     </div>
-    <script>${giftBlocksScript()}</script>`
-        : ""
-    }`;
+
+    <div class="card card-neon" style="margin-top:16px">
+      <div class="card-head"><h3>${icons.sparkles} Presentes cadastrados</h3></div>
+      <div class="card-body">
+        ${list}
+        <div id="gift-new-blocks" class="seq-block" style="margin-top:16px"></div>
+        <button type="button" class="btn btn-secondary btn-sm" id="gift-add-btn" ${canSave ? "" : "disabled"}>${icons.plus} Adicionar presente</button>
+        <button type="submit" form="gift-save-form" class="btn btn-primary" style="margin-left:8px" ${canSave ? "" : "disabled"}>
+          Salvar tudo
+        </button>
+      </div>
+    </div>
+    <script>${giftBlocksScript(canSave)}</script>`;
 
   return appLayout("Pedir presentes", "gifts", body, partial);
 }
 
-function giftBlocksScript() {
+function giftBlocksScript(canSave: boolean) {
   return `
 (function(){
   var wrap = document.getElementById("gift-new-blocks");
   var btn = document.getElementById("gift-add-btn");
   if (!wrap || !btn) return;
+  var enabled = ${canSave ? "true" : "false"};
   function add(){
+    if (!enabled) return;
     var row = document.createElement("div");
     row.className = "gift-add-row";
-    row.innerHTML = '<label class="field">Nome do presente<input name="giftName" placeholder="Ex: Pix de R$ 10" /></label>'
-      + '<label class="field">Mensagem ao pedir<textarea name="giftAsk" rows="2" placeholder="amor, me manda um pixinho de 10? 🥺"></textarea></label>'
+    row.innerHTML = '<label class="field">Nome do presente<input name="giftName" form="gift-save-form" placeholder="Ex: Pix de R$ 10" /></label>'
+      + '<label class="field">Mensagem ao pedir<textarea name="giftAsk" form="gift-save-form" rows="2" placeholder="amor, me manda um pixinho de 10? 🥺"></textarea></label>'
       + '<button type="button" class="btn btn-secondary btn-sm gift-row-remove">Remover</button>';
     row.querySelector(".gift-row-remove").onclick = function(){ row.remove(); };
     wrap.appendChild(row);
   }
-  btn.onclick = add;
-  add();
+  if (enabled) {
+    btn.onclick = add;
+    add();
+  }
 })();
 `.trim();
 }

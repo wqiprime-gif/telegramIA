@@ -718,6 +718,16 @@ console.log(
 
 void restartBots().catch((error) => console.error("Erro ao iniciar bots:", error));
 
+const { processDueScheduledCampaigns } = await import("./lib/scheduled-campaigns.js");
+setInterval(() => {
+  void processDueScheduledCampaigns().catch((error) =>
+    console.error("[schedule] Erro ao processar campanhas:", error)
+  );
+}, 30_000);
+void processDueScheduledCampaigns().catch((error) =>
+  console.error("[schedule] Erro na verificação inicial:", error)
+);
+
 process.once("SIGINT", () => {
   for (const runtime of runningBots.values()) runtime.bot.stop("SIGINT");
 });

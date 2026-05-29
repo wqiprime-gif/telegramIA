@@ -155,6 +155,9 @@ export async function initDatabase() {
     const { initEventsSchema } = await import("./events.js");
     await initEventsSchema();
 
+    const { initScheduledCampaignsSchema } = await import("../lib/scheduled-campaigns.js");
+    await initScheduledCampaignsSchema();
+
     await migrateFromJsonFiles(db);
 
     console.log("[db] PostgreSQL conectado e schema pronto.");
