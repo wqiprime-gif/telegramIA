@@ -932,4 +932,147 @@ button, input, textarea, select { font-family: inherit; }
 .product-rank.rank-gold { background: rgba(255, 200, 87, 0.2); color: #ffc857; }
 .product-rank.rank-silver { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
 .product-rank.rank-bronze { background: rgba(255, 140, 80, 0.15); color: #fdba74; }
+
+/* 3D glass — painel */
+.panel-scene-wrap--app { opacity: 0.35; mask-image: radial-gradient(ellipse 80% 70% at 70% 20%, black, transparent 75%); }
+.glass-3d {
+  background: rgba(8, 8, 14, 0.72);
+  border: 1px solid rgba(255, 45, 85, 0.22);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 24px 80px rgba(0, 0, 0, 0.55),
+    0 0 40px rgba(255, 45, 85, 0.08);
+  backdrop-filter: blur(22px) saturate(1.2);
+  transform-style: preserve-3d;
+}
+.content:has(.tg-workspace) { padding: 12px 16px 8px; max-width: none; }
+
+/* Telegram inbox */
+.tg-workspace {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) 1fr;
+  gap: 14px;
+  height: calc(100vh - 148px);
+  min-height: 480px;
+}
+@media (max-width: 900px) {
+  .tg-workspace { grid-template-columns: 1fr; height: auto; }
+  .tg-chat { min-height: 420px; }
+}
+.tg-threads {
+  display: flex; flex-direction: column;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  min-height: 0;
+}
+.tg-threads-head {
+  padding: 16px 18px 10px;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.tg-threads-head h2 { font-family: var(--font-display); font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
+.tg-threads-hint { font-size: 0.68rem; color: var(--accent-sky); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+.tg-search-wrap { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.tg-search-wrap input {
+  width: 100%; padding: 10px 14px; border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--text);
+}
+.tg-thread-list { flex: 1; overflow-y: auto; min-height: 0; }
+.tg-thread {
+  width: 100%; text-align: left; border: none; cursor: pointer;
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 14px 16px;
+  background: transparent;
+  color: var(--text);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.2s var(--ease), transform 0.2s;
+}
+.tg-thread:hover { background: rgba(255, 45, 85, 0.08); }
+.tg-thread.is-active {
+  background: linear-gradient(90deg, rgba(255, 45, 85, 0.18), transparent);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+.tg-avatar {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 0.85rem;
+  background: linear-gradient(135deg, var(--primary), var(--accent-violet));
+  box-shadow: 0 8px 24px rgba(255, 45, 85, 0.35);
+}
+.tg-avatar--lg { width: 52px; height: 52px; font-size: 1rem; }
+.tg-thread-body { flex: 1; min-width: 0; }
+.tg-thread-top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.tg-thread-top strong { font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tg-thread-top time { font-size: 0.68rem; color: var(--muted); flex-shrink: 0; }
+.tg-thread-sub { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+.tg-thread-preview { font-size: 0.8rem; color: var(--text-2); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tg-you { color: var(--accent-sky); }
+.tg-badge {
+  font-size: 0.65rem; font-weight: 800; padding: 3px 7px; border-radius: 999px;
+  background: var(--primary); color: #fff; align-self: center;
+}
+.tg-chat {
+  display: flex; flex-direction: column;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  min-height: 0;
+}
+.tg-chat-head {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.35);
+}
+.tg-chat-head-active, .tg-chat-head-placeholder {
+  display: flex; align-items: center; gap: 14px;
+}
+.tg-chat-head-active span, .tg-chat-head-placeholder span { display: block; font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+.tg-messages {
+  flex: 1; overflow-y: auto; min-height: 0;
+  padding: 20px 18px;
+  display: flex; flex-direction: column; gap: 10px;
+  background:
+    radial-gradient(ellipse 50% 40% at 100% 0%, rgba(0, 212, 255, 0.06), transparent),
+    radial-gradient(ellipse 40% 30% at 0% 100%, rgba(255, 45, 85, 0.08), transparent),
+    repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(255,255,255,0.02) 28px, rgba(255,255,255,0.02) 29px);
+}
+.tg-empty-chat {
+  flex: 1; display: grid; place-items: center; text-align: center;
+  color: var(--muted); padding: 40px;
+  position: relative;
+}
+.tg-empty-orbit {
+  width: 120px; height: 120px; border-radius: 50%;
+  border: 2px solid rgba(255, 45, 85, 0.25);
+  box-shadow: 0 0 60px rgba(255, 45, 85, 0.2);
+  animation: tg-spin 8s linear infinite;
+  margin-bottom: 16px;
+}
+@keyframes tg-spin { to { transform: rotate(360deg); } }
+.tg-loading { padding: 24px; text-align: center; color: var(--muted); font-size: 0.88rem; }
+.tg-bubble { max-width: 78%; display: flex; flex-direction: column; gap: 4px; animation: tg-in 0.25s var(--ease); }
+@keyframes tg-in { from { opacity: 0; transform: translateY(8px); } }
+.tg-bubble--in { align-self: flex-start; }
+.tg-bubble--out { align-self: flex-end; }
+.tg-bubble--system { align-self: center; max-width: 92%; }
+.tg-bubble--system span {
+  font-size: 0.72rem; color: var(--muted); padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05); border-radius: 999px;
+}
+.tg-bubble-meta { font-size: 0.68rem; color: var(--muted); padding: 0 6px; }
+.tg-bubble-text {
+  padding: 10px 14px; border-radius: 16px; font-size: 0.9rem; line-height: 1.45;
+  word-break: break-word;
+}
+.tg-bubble--in .tg-bubble-text {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom-left-radius: 4px;
+}
+.tg-bubble--out .tg-bubble-text {
+  background: linear-gradient(135deg, rgba(255, 45, 85, 0.9), rgba(168, 85, 247, 0.75));
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 8px 28px rgba(255, 45, 85, 0.25);
+}
 `;

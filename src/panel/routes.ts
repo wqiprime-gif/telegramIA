@@ -11,7 +11,8 @@ import {
   dashboardStats,
   getLatestSale,
   leadSourcesStats,
-  listConversations,
+  getConversationMessages,
+  listConversationThreads,
   listLeads,
   listProducts,
   listReceipts,
@@ -33,7 +34,6 @@ import {
 } from "../lib/session.js";
 import { getApiKeyStatus, getOpenAIModel, updateOpenAISettings } from "../lib/settings.js";
 import {
-  conversationsPage,
   leadsPage,
   mediaPage,
   paymentsPage,
@@ -41,6 +41,7 @@ import {
   remarketingPage,
   salesChartSvgFromData
 } from "./pages.js";
+import { conversationsPage } from "./conversations-page.js";
 import { audiosPage } from "./audios-page.js";
 import {
   activityFeedHtml,
@@ -437,14 +438,36 @@ export async function registerPanelRoutes(
     }
   });
 
+  app.get("/api/panel/conversations/threads", async (request, reply) => {
+    const user = requireUser(request, reply);
+    if (!user) return;
+    const botIds = (await loadBots(user.id)).map((b) => b.id);
+    const threads = await listConversationThreads(botIds, 120);
+    return reply.send({ threads });
+  });
+
+  app.get("/api/panel/conversations/messages", async (request, reply) => {
+    const user = requireUser(request, reply);
+    if (!user) return;
+    const query = z
+      .object({ botId: z.string().uuid(), chatId: z.coerce.number() })
+      .parse(request.query);
+    const allowed = new Set((await loadBots(user.id)).map((b) => b.id));
+    if (!allowed.has(query.botId)) return reply.code(403).send({ error: "forbidden" });
+    const messages = await getConversationMessages(query.botId, query.chatId, 300);
+    return reply.send({ messages });
+  });
+
+  app.get("/panel/conversations.js", async (_request, reply) => {
+    const filePath = path.join(rootDir, "public", "panel", "conversations.js");
+    const body = await fs.readFile(filePath, "utf8");
+    return reply.type("application/javascript").send(body);
+  });
+
   app.get("/conversations", async (request, reply) => {
     const user = requireUser(request, reply);
     if (!user) return;
-    const html = conversationsPage(
-      await rowsForUser(await listConversations(120), user.id),
-      isPartial(request)
-    );
-    return reply.type("text/html").send(html);
+    return reply.type("text/html").send(conversationsPage(isPartial(request)));
   });
 
   app.get("/payments", async (request, reply) => {
@@ -554,7 +577,7 @@ export async function registerPanelRoutes(
         pixRecipientName: body.pixRecipientName?.trim() || body.name,
         messageDelayMs: messageDelayMsFromForm(body),
         previewMediaUrls: [...existing.previewMediaUrls, ...previewUploads],
-        deliveryMediaUrls: [...existing.deliveryMediaUrls, ...deliveryUploads],
+        deliveryMediaUrls: existing.deliveryMediaUrls,
         audioLibrary: mergeAudioLibrary(existing.audioLibrary ?? [], fields, newNamedAudioUrl),
         avatarUrl: avatarUrl || existing.avatarUrl,
         active: body.active === "true",
@@ -564,7 +587,7 @@ export async function registerPanelRoutes(
           : existing.laranjinhaApiKeyEncrypted,
         productName: body.productName,
         productPriceCents: Math.round(body.productPrice * 100),
-        telegramGroupLink: body.telegramGroupLink.trim()
+        telegramGroupLink: ""
       });
 
       hooks.restartBots();
@@ -643,7 +666,7 @@ export async function registerPanelRoutes(
         pixRecipientName: body.pixRecipientName?.trim() || body.name,
         messageDelayMs: messageDelayMsFromForm(body),
         previewMediaUrls: previewUploads,
-        deliveryMediaUrls: deliveryUploads,
+        deliveryMediaUrls: [],
         audioLibrary: mergeAudioLibrary([], fields, newNamedAudioUrl),
         avatarUrl,
         active: body.active === "true",
@@ -653,7 +676,7 @@ export async function registerPanelRoutes(
           : undefined,
         productName: body.productName,
         productPriceCents: Math.round(body.productPrice * 100),
-        telegramGroupLink: body.telegramGroupLink.trim()
+        telegramGroupLink: ""
       });
 
       hooks.restartBots();

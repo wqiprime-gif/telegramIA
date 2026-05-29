@@ -398,6 +398,125 @@ export async function listConversations(limit = 80) {
   return store.messages.slice(-limit).reverse();
 }
 
+export type ConversationThread = {
+  botId: string;
+  botName: string;
+  chatId: number;
+  displayName: string;
+  username?: string;
+  source: string;
+  lastMessageAt: string;
+  lastPreview: string;
+  lastRole: string;
+  messageCount: number;
+};
+
+export async function listConversationThreads(botIds: string[] | null, limit = 80) {
+  if (botIds && botIds.length === 0) return [];
+
+  if (useDatabase()) {
+    const params: unknown[] = [limit];
+    const scope = botIds ? " AND l.bot_id = ANY($2::uuid[])" : "";
+    if (botIds) params.push(botIds);
+
+    const { rows } = await getPool().query<{
+      bot_id: string;
+      bot_name: string;
+      chat_id: string;
+      display_name: string | null;
+      username: string | null;
+      source: string;
+      last_message_at: string;
+      last_preview: string | null;
+      last_role: string | null;
+      message_count: string;
+    }>(
+      `SELECT l.bot_id, COALESCE(b.name, 'Bot') AS bot_name, l.chat_id,
+              l.display_name, l.username, COALESCE(l.source, 'unknown') AS source,
+              l.last_message_at,
+              lm.content AS last_preview, lm.role AS last_role,
+              (SELECT COUNT(*)::text FROM conversation_messages cm
+               WHERE cm.bot_id = l.bot_id AND cm.chat_id = l.chat_id) AS message_count
+       FROM leads l
+       LEFT JOIN bots b ON b.id = l.bot_id
+       LEFT JOIN LATERAL (
+         SELECT content, role, created_at FROM conversation_messages
+         WHERE bot_id = l.bot_id AND chat_id = l.chat_id
+         ORDER BY created_at DESC LIMIT 1
+       ) lm ON true
+       WHERE 1=1${scope}
+       ORDER BY COALESCE(lm.created_at, l.last_message_at) DESC
+       LIMIT $1`,
+      params
+    );
+
+    return rows.map((r) => ({
+      botId: r.bot_id,
+      botName: r.bot_name,
+      chatId: Number(r.chat_id),
+      displayName: r.display_name || r.username || `Lead ${r.chat_id}`,
+      username: r.username ?? undefined,
+      source: r.source,
+      lastMessageAt: new Date(r.last_message_at).toISOString(),
+      lastPreview: String(r.last_preview ?? "").slice(0, 120),
+      lastRole: r.last_role ?? "user",
+      messageCount: Number(r.message_count ?? 0)
+    }));
+  }
+
+  const store = await loadFileStore();
+  const bots = await (await import("../bots.js")).loadBots();
+  const botName = (id: string) => bots.find((b) => b.id === id)?.name ?? "Bot";
+  const threads: ConversationThread[] = [];
+
+  for (const lead of store.leads) {
+    if (botIds && !botIds.includes(lead.botId)) continue;
+    const msgs = store.messages
+      .filter((m) => m.botId === lead.botId && m.chatId === lead.chatId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const last = msgs[msgs.length - 1];
+    threads.push({
+      botId: lead.botId,
+      botName: botName(lead.botId),
+      chatId: lead.chatId,
+      displayName: lead.displayName || lead.username || `Lead ${lead.chatId}`,
+      username: lead.username,
+      source: lead.source || "unknown",
+      lastMessageAt: last?.createdAt ?? lead.lastMessageAt,
+      lastPreview: (last?.content ?? "").slice(0, 120),
+      lastRole: last?.role ?? "user",
+      messageCount: msgs.length
+    });
+  }
+
+  return threads
+    .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt))
+    .slice(0, limit);
+}
+
+export async function getConversationMessages(botId: string, chatId: number, limit = 200) {
+  if (useDatabase()) {
+    const { rows } = await getPool().query(
+      `SELECT role, content, created_at FROM conversation_messages
+       WHERE bot_id = $1 AND chat_id = $2
+       ORDER BY created_at ASC LIMIT $3`,
+      [botId, chatId, limit]
+    );
+    return rows.map((r) => ({
+      role: r.role as "user" | "assistant" | "system",
+      content: String(r.content),
+      createdAt: new Date(r.created_at as string).toISOString()
+    }));
+  }
+
+  const store = await loadFileStore();
+  return store.messages
+    .filter((m) => m.botId === botId && m.chatId === chatId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .slice(-limit)
+    .map((m) => ({ role: m.role, content: m.content, createdAt: m.createdAt }));
+}
+
 export async function listReceipts(limit = 50) {
   if (useDatabase()) {
     const { rows } = await getPool().query(

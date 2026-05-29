@@ -71,8 +71,6 @@ export function botInstanceForm(mode: "new" | "edit", bot?: BotConfig) {
   const paymentPix = !isEdit || bot.paymentMethod !== "laranjinha";
   const delay = delayPartsFromMs(isEdit ? bot.messageDelayMs : 4000);
   const previewAudios = isEdit ? countAudioUrls(bot.previewMediaUrls) : 0;
-  const deliveryAudios = isEdit ? countAudioUrls(bot.deliveryMediaUrls) : 0;
-
   return `
     <form method="post" action="${action}" enctype="multipart/form-data">
       <div class="form-grid">
@@ -154,7 +152,7 @@ export function botInstanceForm(mode: "new" | "edit", bot?: BotConfig) {
               <input name="newAudioFile" type="file" accept="audio/*,.ogg,.opus,audio/ogg" />
             </div>
           </label>
-          ${isEdit ? `<p class="form-hint">Prévia: ${previewAudios} áudio(s) · Entrega: ${deliveryAudios} áudio(s) em mídias gerais</p>` : ""}
+          ${isEdit ? `<p class="form-hint">Prévia: ${previewAudios} áudio(s) cadastrado(s)</p>` : ""}
         </div>
 
         <label class="field span-2" id="prompt">Prompt / persona da IA
@@ -194,14 +192,6 @@ export function botInstanceForm(mode: "new" | "edit", bot?: BotConfig) {
             <input name="previewFiles" type="file" accept="image/*,video/*,audio/*,.ogg,.opus" multiple />
           </div>
         </label>
-        <label class="field span-2">
-          <span>Entregas após pagamento</span>
-          ${isEdit ? mediaChips(bot.deliveryMediaUrls, "Entregas atuais") : ""}
-          <div class="dropzone">
-            <p style="color:var(--muted);margin-bottom:8px">${icons.upload} ${isEdit ? "Adicionar mais entregas" : "Arquivos após Pix aprovado"}</p>
-            <input name="deliveryFiles" type="file" accept="image/*,video/*,audio/*,.ogg,.opus,application/pdf" multiple />
-          </div>
-        </label>
         <label class="field">Forma de pagamento
           <select name="paymentMethod">
             <option value="pix" ${paymentPix ? "selected" : ""}>Pix manual (chave)</option>
@@ -216,9 +206,6 @@ export function botInstanceForm(mode: "new" | "edit", bot?: BotConfig) {
         </label>
         <label class="field">Preço (R$)
           <input name="productPrice" type="number" step="0.01" min="1" value="${price}" required />
-        </label>
-        <label class="field span-2">Link do grupo Telegram (entrega após pagamento)
-          <input name="telegramGroupLink" value="${isEdit ? escapeHtml(bot.telegramGroupLink) : ""}" placeholder="https://t.me/+seu_grupo_vip" />
         </label>
       </div>
       <button type="submit" class="btn btn-primary btn-block" style="margin-top:12px">
@@ -235,7 +222,7 @@ export function instancesTableHtml(bots: BotConfig[]) {
   return `<div class="table-scroll" role="region" aria-label="Lista de instâncias">
     <table class="table table-instances">
     <thead><tr>
-      <th>Bot</th><th>Status</th><th>Leads</th><th>Prévias</th><th>Entregas</th>
+      <th>Bot</th><th>Status</th><th>Leads</th><th>Prévias</th>
       <th class="th-actions">Ações</th>
     </tr></thead>
     <tbody>
@@ -260,7 +247,6 @@ export function instancesTableHtml(bots: BotConfig[]) {
         </td>
         <td><span class="metric">—</span></td>
         <td><span class="metric">${bot.previewMediaUrls.length}</span></td>
-        <td><span class="metric">${bot.deliveryMediaUrls.length}</span></td>
         <td class="td-actions">
           <div class="row-actions">
             <a href="/instances/${bot.id}/edit" class="action-btn" title="Editar configuração">

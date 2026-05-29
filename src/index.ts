@@ -155,31 +155,13 @@ async function deliverProduct(input: {
     paymentMethod: config.paymentMethod
   });
 
-  if (config.telegramGroupLink) {
-    await humanSendText(
-      telegram,
-      chatId,
-      config,
-      `Seu grupo VIP:\n${config.telegramGroupLink}\n\nEntre pelo link acima. Qualquer duvida, me chama aqui.`
-    );
-    await logMessage({
-      botId: config.id,
-      chatId,
-      role: "system",
-      content: `Entrega grupo: ${config.telegramGroupLink}`
-    });
-  }
-
-  if (config.deliveryMediaUrls.length > 0) {
-    await humanSendMediaList(telegram, chatId, config, config.deliveryMediaUrls);
-  } else if (!config.telegramGroupLink) {
-    await humanSendText(
-      telegram,
-      chatId,
-      config,
-      "Produto liberado, mas configure entrega (grupo ou midia) no painel."
-    );
-  }
+  await humanSendText(telegram, chatId, config, "Pagamento confirmado amor, obrigada! 💕");
+  await logMessage({
+    botId: config.id,
+    chatId,
+    role: "system",
+    content: "[venda] Pagamento confirmado — bot silenciado"
+  });
 }
 
 async function handleReceiptResult(input: {

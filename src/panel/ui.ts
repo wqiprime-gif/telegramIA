@@ -135,7 +135,7 @@ export function loginPage(message = "") {
       ${brandMarkHtml("Painel Telegram")}
       <h1><span class="brand-accent">Bots</span> que vendem no automático</h1>
       <p style="color:var(--text-2);line-height:1.65;max-width:440px">
-        IA humanizada, áudios por gatilho, Pix, comprovantes e remarketing personalizado — tudo no estilo profissional de gestor de bots.
+        IA humanizada, áudios por gatilho, Pix, comprovantes, chat no painel e remarketing — visual premium com WebGL.
       </p>
       <div class="login-pills">
         <span class="login-pill">Áudios inteligentes</span>

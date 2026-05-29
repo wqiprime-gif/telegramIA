@@ -3,6 +3,7 @@ import { globalStyles } from "./styles.js";
 import { icons } from "./icons.js";
 import { panelClientScript } from "./panel-client.js";
 import { brandMarkHtml } from "./brand.js";
+import { panelSceneScript } from "./panel-scene.js";
 
 export type NavId =
   | "dashboard"
@@ -52,6 +53,7 @@ export function appLayout(
   <style>${globalStyles}</style>
 </head>
 <body>
+  <div class="panel-scene-wrap panel-scene-wrap--app" aria-hidden="true"><canvas id="panel-scene-canvas"></canvas></div>
   <div class="ambient" aria-hidden="true"></div>
   <div class="app">
     <aside class="sidebar">
@@ -100,6 +102,7 @@ export function appLayout(
   </div>
   <div id="panel-toasts" class="panel-toasts"></div>
 ${panelClientScript}
+  <script>${panelSceneScript()}</script>
 </body>
 </html>`;
 }

@@ -42,29 +42,6 @@ export function leadsPage(rows: Record<string, unknown>[], partial?: boolean) {
   return wrap("Leads", "leads", body.replaceAll("<div", "<div").replaceAll("</div>", "</div>"), partial);
 }
 
-export function conversationsPage(rows: Record<string, unknown>[], partial?: boolean) {
-  const list =
-    rows.length === 0
-      ? `<div class="empty">Nenhuma conversa registrada ainda.</div>`
-      : rows
-          .map((m) => {
-            const role = String(m.role);
-            const cls = role === "user" ? "activity-icon lead" : "activity-icon sale";
-            return `<div class="activity-item">
-              <div class="${cls}">${role === "user" ? icons.users : icons.sparkles}</div>
-              <div class="activity-text">
-                <strong>${escapeHtml(String(m.bot_name || "Bot"))}</strong> · chat ${m.chat_id}<br/>
-                <span style="color:var(--muted)">${role === "user" ? "Lead" : "Bot"}:</span> ${escapeHtml(String(m.content).slice(0, 200))}
-              </div>
-              <div class="activity-time">${formatDate(String(m.created_at || m.createdAt))}</div>
-            </div>`;
-          })
-          .join("");
-
-  const body = `<div class="card"><div class="card-head"><h3>${icons.chat} Conversas</h3></div><div class="card-body">${list}</div></div>`;
-  return wrap("Conversas", "conversations", body.replaceAll("<div", "<div").replaceAll("</div>", "</div>"), partial);
-}
-
 export function paymentsPage(rows: Record<string, unknown>[], partial?: boolean) {
   const list =
     rows.length === 0
