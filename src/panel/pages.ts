@@ -126,6 +126,48 @@ export function productsPage(
   return wrap("Produtos", "products", body, partial);
 }
 
+function remarketingBlocksScript() {
+  return `
+(function(){
+  var wrap = document.getElementById("seq-messages");
+  var addBtn = document.getElementById("seq-add-btn");
+  var idx = wrap ? wrap.querySelectorAll(".seq-msg-block").length : 0;
+  function renumber(){
+    if (!wrap) return;
+    wrap.querySelectorAll(".seq-msg-block").forEach(function(el, i){
+      var lab = el.querySelector(".seq-label");
+      if (lab) lab.textContent = "Mensagem " + (i + 1);
+      var ta = el.querySelector("textarea");
+      if (ta) ta.name = "seq_" + i;
+    });
+    idx = wrap.querySelectorAll(".seq-msg-block").length;
+  }
+  function addBlock(val){
+    if (!wrap) return;
+    var block = document.createElement("div");
+    block.className = "seq-msg-block";
+    block.innerHTML = '<label class="field"><span class="seq-label">Mensagem ' + (idx + 1) + '</span>'
+      + '<textarea name="seq_' + idx + '" rows="2" class="remarketing-msg" placeholder="Digite a mensagem..."></textarea></label>'
+      + '<button type="button" class="btn btn-secondary btn-sm seq-remove">Remover</button>';
+    var ta = block.querySelector("textarea");
+    if (val && ta) ta.value = val;
+    block.querySelector(".seq-remove").onclick = function(){ block.remove(); renumber(); };
+    wrap.appendChild(block);
+    idx++;
+  }
+  if (addBtn) addBtn.onclick = function(){ addBlock(""); };
+  document.getElementById("rmk-select-all")?.addEventListener("click", function(e){
+    e.preventDefault();
+    document.querySelectorAll('input[name="botIds"]').forEach(function(c){ c.checked = true; });
+  });
+  document.getElementById("rmk-select-none")?.addEventListener("click", function(e){
+    e.preventDefault();
+    document.querySelectorAll('input[name="botIds"]').forEach(function(c){ c.checked = false; });
+  });
+})();
+`.trim();
+}
+
 export function remarketingPage(
   bots: BotConfig[],
   selectedBotIds: string[],
@@ -137,8 +179,12 @@ export function remarketingPage(
   const botNameById = new Map(bots.map((b) => [b.id, b.name]));
   const botChecks =
     bots.length === 0
-      ? `<p class="form-hint">Cadastre uma instância primeiro.</p>`
-      : `<div class="bot-check-grid">
+      ? `<p class="form-hint">Nenhuma instância ainda. <a href="/instances/new" style="color:var(--blue)">Criar instância</a></p>`
+      : `<div class="rmk-instance-toolbar">
+          <button type="button" class="btn btn-secondary btn-sm" id="rmk-select-all">Marcar todas</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="rmk-select-none">Desmarcar</button>
+        </div>
+        <div class="bot-check-grid">
           ${bots
             .map(
               (b) => `<label class="bot-check">
@@ -147,7 +193,8 @@ export function remarketingPage(
             </label>`
             )
             .join("")}
-        </div>`;
+        </div>
+        <p class="form-hint">Marque quantas instâncias quiser. Clique em &quot;Aplicar seleção&quot; para carregar os leads.</p>`;
 
   const leadRows =
     leads.length === 0
@@ -177,33 +224,50 @@ export function remarketingPage(
         <p class="hero-desc">Selecione várias instâncias, defina uma <strong>sequência de mensagens</strong> com delay e personalize por lead se quiser.</p>
       </div>
     </div>
-    <form method="post" action="/remarketing" class="card card-neon">
+    <form method="post" action="/remarketing" id="rmk-form" class="card card-neon">
       <div class="card-head"><h3>${icons.megaphone} Campanha</h3></div>
       <div class="card-body">
         <label class="field">Instâncias
           ${botChecks}
         </label>
+        <button type="submit" class="btn btn-secondary btn-sm" formaction="/remarketing" formmethod="get" style="margin:8px 0 16px" ${bots.length === 0 ? "disabled" : ""}>
+          Aplicar seleção
+        </button>
         <div class="seq-block">
-          <h4 style="margin:16px 0 10px;font-size:0.9rem">Sequência de mensagens (todas as instâncias)</h4>
-          <label class="field">Mensagem 1<textarea name="seq_0" rows="2" class="remarketing-msg" placeholder="Oi amor, sumiu? 😘"></textarea></label>
-          <label class="field">Mensagem 2<textarea name="seq_1" rows="2" class="remarketing-msg" placeholder="Opcional — segunda mensagem"></textarea></label>
-          <label class="field">Mensagem 3<textarea name="seq_2" rows="2" class="remarketing-msg" placeholder="Opcional — terceira mensagem"></textarea></label>
+          <div class="seq-head-row">
+            <h4>Sequência de mensagens</h4>
+            <button type="button" class="btn btn-secondary btn-sm" id="seq-add-btn">${icons.plus} Nova mensagem</button>
+          </div>
+          <div id="seq-messages">
+            <div class="seq-msg-block">
+              <label class="field"><span class="seq-label">Mensagem 1</span>
+                <textarea name="seq_0" rows="2" class="remarketing-msg" placeholder="Oi amor, sumiu? 😘"></textarea>
+              </label>
+            </div>
+          </div>
           <label class="field">Delay entre mensagens (segundos)
-            <input name="seqDelaySec" type="number" min="0" max="300" value="8" />
+            <input name="seqDelaySec" type="number" min="0" max="300" value="10" />
           </label>
         </div>
-        <div class="table-scroll remarketing-table-wrap" role="region">
-          <table class="table remarketing-table">
-            <thead><tr><th>Instância</th><th>Lead</th><th>Chat</th><th>Extra (opcional)</th></tr></thead>
-            <tbody>${leadRows}</tbody>
-          </table>
-        </div>
-        <p class="form-hint">Sequência + mensagem extra por lead. Delay humano entre cada bolha da sequência.</p>
+        ${
+          leads.length > 0
+            ? `<details class="rmk-leads-details" open>
+          <summary>Mensagem extra por lead (opcional)</summary>
+          <div class="table-scroll remarketing-table-wrap" role="region">
+            <table class="table remarketing-table">
+              <thead><tr><th>Instância</th><th>Lead</th><th>Chat</th><th>Extra</th></tr></thead>
+              <tbody>${leadRows}</tbody>
+            </table>
+          </div>
+        </details>`
+            : `<p class="form-hint">Selecione instâncias e clique em &quot;Aplicar seleção&quot; para ver leads e personalizar.</p>`
+        }
         <button type="submit" class="btn btn-primary btn-block" ${bots.length === 0 ? "disabled" : ""}>
           Enviar remarketing
         </button>
       </div>
-    </form>`;
+    </form>
+    <script>${remarketingBlocksScript()}</script>`;
 
   return wrap("Remarketing", "remarketing", body, partial);
 }

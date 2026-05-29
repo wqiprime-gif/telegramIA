@@ -5,22 +5,31 @@ export type PromptAction =
   | "send_amostra_gratis"
   | "naosou_fake"
   | "ignorar_lead"
-  | "chamada_video";
+  | "chamada_video"
+  | "pedir_presente";
 
 const ACTION_RE =
-  /\[\[(send_informacoes|send_amostra_gratis|naosou_fake|ignorar_lead|chamada_video)\]\]/gi;
+  /\[\[(send_informacoes|send_amostra_gratis|naosou_fake|ignorar_lead|chamada_video|pedir_presente)\]\]/gi;
+
+const GIFT_TAG_RE = /\[\[pedir_presente(?::([a-z0-9_]+))?\]\]/gi;
 
 export function parsePromptActions(text: string) {
   const actions: PromptAction[] = [];
+  let giftSlug: string | undefined;
   const audioSlugs = parseAudioTags(text);
-  const clean = text
+  let clean = text.replace(GIFT_TAG_RE, (_, slug) => {
+    actions.push("pedir_presente");
+    if (slug) giftSlug = slug.toLowerCase();
+    return "";
+  });
+  clean = clean
     .replace(ACTION_RE, (_, tag) => {
       actions.push(tag.toLowerCase() as PromptAction);
       return "";
     })
     .replace(/\[\[audio:([a-z0-9_]+)\]\]|\[\[audio_([a-z0-9_]+)\]\]/gi, "")
     .trim();
-  return { clean, actions: [...new Set(actions)], audioSlugs };
+  return { clean, actions: [...new Set(actions)], audioSlugs, giftSlug };
 }
 
 export function priceTableMessage() {
@@ -44,6 +53,8 @@ ACOES (tag na ultima linha quando precisar):
 [[naosou_fake]] = mesmo que [[audio:nao_sou_fake]] se existir no cadastro
 [[ignorar_lead]] = parar de responder lead enrolado
 [[chamada_video]] = explicar chamada 5 min aqui no Telegram apos pagamento
+[[pedir_presente]] = pedir um presente/mimo ao lead (use quando fizer sentido no fluxo)
+[[pedir_presente:slug]] = pedir presente especifico cadastrado no painel
 
 INPUTS DE AUDIO (como Pix — use SOMENTE no momento certo, nao toda hora):
 - No seu prompt: "se lead desconfiar use [[audio:nao_sou_fake]]"

@@ -138,19 +138,18 @@ export function loginPage(message = "") {
   <main class="login-premium">
     <section class="login-showcase">
       ${brandMarkHtml("Painel Telegram")}
-      <p class="login-eyebrow">Plataforma de automação comercial</p>
-      <h1 class="login-title-3d"><span class="text-3d-line">BotManager</span><span class="text-3d-line accent">Operação de vendas no Telegram</span></h1>
+      <p class="login-eyebrow">Painel profissional · Telegram</p>
+      <h1 class="login-title-3d"><span class="text-3d-line">BotManager</span><span class="text-3d-line accent">Vendas automatizadas com IA</span></h1>
       <p class="login-prose">
-        O <strong>BotManager</strong> centraliza a operação dos seus bots de venda no Telegram:
-        atendimento com IA no fluxo Byanca Costa, geração de Pix, validação de comprovantes,
-        remarketing segmentado e histórico completo de conversas — com métricas em tempo real
-        para escalar campanhas com previsibilidade.
+        Uma plataforma feita para quem vende no Telegram com escala: cada instância roda com
+        <strong>prompt próprio</strong>, fluxo Byanca Costa, Pix automático, validação de comprovante,
+        remarketing por instância, pedido de presentes e conversas espelhadas no painel — tudo em um só lugar.
       </p>
       <ul class="login-capabilities">
-        <li>Instâncias isoladas por produto, com prompt e pacotes configuráveis</li>
-        <li>Conversas espelhadas no painel, no mesmo padrão visual do Telegram</li>
-        <li>Rastreio de origem (TikTok, Instagram e demais fontes) por lead</li>
-        <li>Dashboard com vendas, leads, instâncias ativas e atividades recentes</li>
+        <li>Várias instâncias por produto, com pacotes e IA configuráveis</li>
+        <li>Remarketing com sequência de mensagens e delay entre envios</li>
+        <li>Rastreio de origem do lead (TikTok, Instagram, anúncios)</li>
+        <li>Dashboard com vendas, leads ativos e atividade em tempo real</li>
       </ul>
     </section>
     <section class="login-card-wrap">

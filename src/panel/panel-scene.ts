@@ -1,7 +1,7 @@
 /** Cena 3D: partículas flutuantes + raios azuis (Three.js). */
 export function panelSceneScript(mode: "auth" | "app" = "app") {
-  const intensity = mode === "auth" ? "0.95" : "0.72";
-  const particles = mode === "auth" ? 2400 : 1400;
+  const intensity = mode === "auth" ? "0.35" : "0.72";
+  const particles = mode === "auth" ? 380 : 1400;
   return `
 (function(){
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;

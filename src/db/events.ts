@@ -161,6 +161,8 @@ export async function initEventsSchema() {
     ALTER TABLE bots ADD COLUMN IF NOT EXISTS product_price_cents INTEGER NOT NULL DEFAULT 4990;
     ALTER TABLE bots ADD COLUMN IF NOT EXISTS telegram_group_link TEXT NOT NULL DEFAULT '';
     ALTER TABLE bots ADD COLUMN IF NOT EXISTS backup_token TEXT;
+    ALTER TABLE bots ADD COLUMN IF NOT EXISTS gift_prompt TEXT NOT NULL DEFAULT '';
+    ALTER TABLE bots ADD COLUMN IF NOT EXISTS gift_items JSONB NOT NULL DEFAULT '[]';
   `);
 }
 

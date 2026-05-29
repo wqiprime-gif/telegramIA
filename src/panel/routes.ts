@@ -45,6 +45,7 @@ import {
 import { messagesChartSvgFromData } from "./charts.js";
 import { conversationsPage } from "./conversations-page.js";
 import { audiosPage } from "./audios-page.js";
+import { giftsPage, mergeGiftItems } from "./gifts-page.js";
 import {
   activityFeedHtml,
   dashboardPage,
@@ -389,20 +390,57 @@ export async function registerPanelRoutes(
     }
   });
 
+  app.get("/gifts", async (request, reply) => {
+    const user = requireUser(request, reply);
+    if (!user) return;
+    const query = z
+      .object({ botId: z.string().optional(), msg: z.string().optional(), t: z.string().optional() })
+      .parse(request.query);
+    const bots = await loadBots(user.id);
+    const botId = query.botId || bots[0]?.id || "";
+    const html = giftsPage(bots, botId, query.msg, query.t === "err", isPartial(request));
+    return reply.type("text/html").send(html);
+  });
+
+  app.post("/gifts", async (request, reply) => {
+    const user = requireUser(request, reply);
+    if (!user) return;
+    let botId = "";
+    try {
+      const raw = (request.body ?? {}) as Record<string, string | string[]>;
+      botId = String(raw.botId || "").trim();
+      if (!botId) throw new Error("Instância não informada.");
+      const bot = await getBotById(botId, user.id);
+      if (!bot) throw new Error("Instância não encontrada.");
+      const giftItems = mergeGiftItems(bot.giftItems ?? [], raw);
+      const giftPrompt = String(raw.giftPrompt || "").trim();
+      await upsertBot({ ...bot, giftPrompt, giftItems });
+      hooks.restartBots();
+      return reply.redirect(flashRedirect(`/gifts?botId=${botId}`, "Presentes atualizados!"));
+    } catch (error) {
+      request.log.error(error);
+      return reply.redirect(
+        flashRedirect(`/gifts?botId=${botId}`, `Erro: ${errorMessage(error)}`, "err")
+      );
+    }
+  });
+
   app.get("/remarketing", async (request, reply) => {
     const user = requireUser(request, reply);
     if (!user) return;
     const query = z
       .object({
-        botIds: z.string().optional(),
+        botIds: z.union([z.string(), z.array(z.string())]).optional(),
         msg: z.string().optional(),
         t: z.string().optional()
       })
       .parse(request.query);
     const bots = await loadBots(user.id);
-    const selectedBotIds = query.botIds
-      ? query.botIds.split(",").filter(Boolean)
-      : bots.map((b) => b.id);
+    const selectedBotIds = Array.isArray(query.botIds)
+      ? query.botIds.filter(Boolean)
+      : query.botIds
+        ? query.botIds.split(",").filter(Boolean)
+        : [];
     const { listLeadsByBots } = await import("../db/events.js");
     const leads = selectedBotIds.length ? await listLeadsByBots(selectedBotIds) : [];
     const html = remarketingPage(bots, selectedBotIds, leads, query.msg, query.t === "err", isPartial(request));
@@ -420,8 +458,10 @@ export async function registerPanelRoutes(
         .filter(Boolean);
       if (botIds.length === 0) throw new Error("Selecione ao menos uma instância.");
 
-      const sequence = [raw.seq_0, raw.seq_1, raw.seq_2]
-        .flat()
+      const sequence = Object.entries(raw)
+        .filter(([key]) => /^seq_\d+$/.test(key))
+        .sort(([a], [b]) => Number(a.slice(4)) - Number(b.slice(4)))
+        .flatMap(([, v]) => (Array.isArray(v) ? v : [v]))
         .map((v) => String(v || "").trim())
         .filter(Boolean);
       const seqDelayMs = Math.max(0, Number(String(raw.seqDelaySec ?? "8")) * 1000);

@@ -37,6 +37,7 @@ import {
   nextColdMessage,
   type LeadState
 } from "./lib/lead-state.js";
+import { giftsPromptHint, pickGiftMessage } from "./lib/gifts.js";
 import {
   naosouFakeMessage,
   parsePromptActions,
@@ -542,6 +543,7 @@ async function launchBotInstance(config: BotConfig, activeToken: string) {
 Pix: ${config.pixKey}. Produto padrao: ${config.productName}.
 ${leadStateContext(leadState)}
 ${PROMPT_ACTION_HINT}
+${(config.giftItems?.length ?? 0) > 0 || config.giftPrompt ? giftsPromptHint(config.giftItems ?? [], config.giftPrompt ?? "") : ""}
 Audios: ${audioLibraryPrompt(library)}.`
           },
           ...history.slice(-12),
@@ -549,7 +551,7 @@ Audios: ${audioLibraryPrompt(library)}.`
         ]
       });
       const rawReply = completion.choices[0]?.message.content?.trim() || "oii amor, me chama de novo 😘";
-      let { clean, actions, audioSlugs } = parsePromptActions(rawReply);
+      let { clean, actions, audioSlugs, giftSlug } = parsePromptActions(rawReply);
 
       if (isFirstTurn) {
         actions = actions.filter((a) => a !== "send_informacoes");
@@ -593,6 +595,10 @@ Audios: ${audioLibraryPrompt(library)}.`
         await humanSendText(ctx.telegram, chatId, config, priceTableMessage());
       } else if (actions.includes("chamada_video")) {
         await humanSendText(ctx.telegram, chatId, config, chamadaVideoMessage());
+      } else if (actions.includes("pedir_presente")) {
+        const giftMsg = pickGiftMessage(config.giftItems ?? [], giftSlug);
+        if (giftMsg) await humanSendText(ctx.telegram, chatId, config, limitSentences(giftMsg));
+        else if (outText) await humanSendText(ctx.telegram, chatId, config, outText);
       } else if (chosenAudio && canSendAudio(chatId, chosenAudio)) {
         await humanSendNamedAudio(ctx.telegram, chatId, config, chosenAudio.url);
         if (actions.includes("naosou_fake")) leadState.hasSentNaoSouFake = true;
