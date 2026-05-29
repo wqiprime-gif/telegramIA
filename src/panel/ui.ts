@@ -128,22 +128,26 @@ export function loginPage(message = "") {
   <style>${globalStyles}</style>
 </head>
 <body class="auth-body">
+  <div class="light-rays" aria-hidden="true"></div>
   <canvas id="panel-scene-canvas" aria-hidden="true"></canvas>
   <div class="mesh-blob" aria-hidden="true"></div>
   <main class="login-premium">
     <section class="login-showcase">
       ${brandMarkHtml("Painel Telegram")}
-      <h1>Venda no automático com <em>IA + WebGL</em></h1>
-      <p class="login-tagline">
-        Painel premium para bots Telegram: conversas ao vivo, Pix, comprovantes,
-        remarketing e fluxo Byanca — tudo em um lugar.
+      <p class="login-eyebrow">Plataforma de automação comercial</p>
+      <h1>BotManager<br><span>Operação de vendas no Telegram</span></h1>
+      <p class="login-prose">
+        O <strong>BotManager</strong> centraliza a operação dos seus bots de venda no Telegram:
+        atendimento com IA no fluxo Byanca Costa, geração de Pix, validação de comprovantes,
+        remarketing segmentado e histórico completo de conversas — com métricas em tempo real
+        para escalar campanhas com previsibilidade.
       </p>
-      <div class="login-features">
-        <span class="login-feature">Chat estilo Telegram</span>
-        <span class="login-feature">3D em tempo real</span>
-        <span class="login-feature">Pix + IA</span>
-        <span class="login-feature">Remarketing</span>
-      </div>
+      <ul class="login-capabilities">
+        <li>Instâncias isoladas por produto, com prompt e pacotes configuráveis</li>
+        <li>Conversas espelhadas no painel, no mesmo padrão visual do Telegram</li>
+        <li>Rastreio de origem (TikTok, Instagram e demais fontes) por lead</li>
+        <li>Dashboard com vendas, leads, instâncias ativas e atividades recentes</li>
+      </ul>
     </section>
     <section class="login-card-wrap">
       <div class="login-card-glow" aria-hidden="true"></div>
@@ -161,7 +165,7 @@ export function loginPage(message = "") {
           <button type="submit" class="btn btn-primary btn-block btn-glow">Entrar no painel</button>
         </form>
         <p style="margin-top:20px;text-align:center;font-size:0.85rem;color:var(--muted)">
-          Nao tem conta? <a href="/register" style="color:#ff6b8a;font-weight:600">Criar conta</a>
+          Nao tem conta? <a href="/register" style="color:#0a5cff;font-weight:600">Criar conta</a>
         </p>
       </div>
     </section>
@@ -184,11 +188,13 @@ export function dashboardPage(
   const salesReais = (data.stats.salesTotalCents / 100).toFixed(2).replace(".", ",");
 
   const body = `
+    <div class="dash-shell">
     ${message ? alertHtml(message, isError ? "error" : "success") : ""}
-    <div class="dash-hero">
+    <div class="dash-hero-pro">
       <div>
-        <h2>Olá, ${escapeHtml(userName.split(" ")[0] || "bem-vindo")} 👋</h2>
-        <p>Central de bots Telegram — instâncias, conversas, vendas e remarketing em um painel premium.</p>
+        <p class="eyebrow">Visão geral · ${escapeHtml(userName)}</p>
+        <h2>Central de operação</h2>
+        <p>Métricas consolidadas das suas instâncias Telegram — leads, conversões, conversas e remarketing em um único painel.</p>
       </div>
       <div class="dash-hero-actions">
         <a href="/instances/new" class="btn btn-primary">${icons.plus} Nova instância</a>
@@ -196,42 +202,34 @@ export function dashboardPage(
       </div>
     </div>
 
-    <div class="stats-row-premium">
-      <div class="stat-card-premium">
-        <div class="stat-icon purple">${icons.layers}</div>
-        <div>
-          <div class="stat-label">Instâncias ativas</div>
-          <div class="stat-value">${active}</div>
-          <div class="stat-delta">${bots.length} cadastrada(s)</div>
-        </div>
+    <div class="metrics-bento">
+      <div class="metric-kpi">
+        <div class="stat-icon">${icons.layers}</div>
+        <div class="stat-label">Instâncias ativas</div>
+        <div class="stat-value accent">${active}</div>
+        <div class="stat-delta">${bots.length} cadastrada(s)</div>
       </div>
-      <div class="stat-card-premium">
-        <div class="stat-icon green">${icons.users}</div>
-        <div>
-          <div class="stat-label">Leads</div>
-          <div class="stat-value" data-live-stat="leads">${data.stats.leads}</div>
-          <div class="stat-delta" data-live-stat="messagesToday">${data.stats.messagesToday} msgs hoje</div>
-        </div>
+      <div class="metric-kpi">
+        <div class="stat-icon">${icons.users}</div>
+        <div class="stat-label">Leads</div>
+        <div class="stat-value" data-live-stat="leads">${data.stats.leads}</div>
+        <div class="stat-delta" data-live-stat="messagesToday">${data.stats.messagesToday} mensagens hoje</div>
       </div>
-      <div class="stat-card-premium">
-        <div class="stat-icon blue">${icons.card}</div>
-        <div>
-          <div class="stat-label">Vendas</div>
-          <div class="stat-value" data-live-stat="salesValue">R$ ${salesReais}</div>
-          <div class="stat-delta" data-live-stat="salesCount">${data.stats.salesCount} venda(s)</div>
-        </div>
+      <div class="metric-kpi">
+        <div class="stat-icon">${icons.card}</div>
+        <div class="stat-label">Receita confirmada</div>
+        <div class="stat-value accent" data-live-stat="salesValue">R$ ${salesReais}</div>
+        <div class="stat-delta" data-live-stat="salesCount">${data.stats.salesCount} venda(s)</div>
       </div>
-      <div class="stat-card-premium">
-        <div class="stat-icon orange">${icons.chat}</div>
-        <div>
-          <div class="stat-label">Prévias</div>
-          <div class="stat-value">${previews}</div>
-          <div class="stat-delta">mídias configuradas</div>
-        </div>
+      <div class="metric-kpi">
+        <div class="stat-icon">${icons.chat}</div>
+        <div class="stat-label">Prévias de mídia</div>
+        <div class="stat-value">${previews}</div>
+        <div class="stat-delta">ativos no funil</div>
       </div>
     </div>
 
-    <div class="grid-2">
+    <div class="dash-bento">
       <div class="card card-premium card--table">
         <div class="card-head">
           <h3>Suas instâncias</h3>
@@ -250,7 +248,7 @@ export function dashboardPage(
       </div>
     </div>
 
-    <div class="grid-2" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+    <div class="grid-2" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-bottom:16px">
       <div class="card card-premium">
         <div class="card-head"><h3>Origem dos leads</h3></div>
         <div class="card-body" data-live="lead-sources">${leadSourcesGridHtml(data.leadSources)}</div>
@@ -275,6 +273,7 @@ export function dashboardPage(
         <div class="card-head"><h3>Top instâncias</h3></div>
         <div class="card-body" data-live="top-bots">${topProducts(data.topBots)}</div>
       </div>
+    </div>
     </div>`;
 
   return appLayout("Dashboard", "dashboard", body, partial, userName);
@@ -348,13 +347,18 @@ export function registerPage(message = "") {
   <style>${globalStyles}</style>
 </head>
 <body class="auth-body">
+  <div class="light-rays" aria-hidden="true"></div>
   <canvas id="panel-scene-canvas" aria-hidden="true"></canvas>
   <div class="mesh-blob" aria-hidden="true"></div>
   <main class="login-premium">
     <section class="login-showcase">
       ${brandMarkHtml("Painel Telegram")}
-      <h1>Crie sua conta <em>premium</em></h1>
-      <p class="login-tagline">Gerencie bots com IA, chat no painel e visual 3D em tempo real.</p>
+      <p class="login-eyebrow">Comece em minutos</p>
+      <h1>Conta <span>BotManager</span></h1>
+      <p class="login-prose">
+        Crie sua conta para configurar instâncias, conectar o Telegram e acompanhar
+        vendas, leads e conversas com o mesmo nível de controle do painel operacional.
+      </p>
     </section>
     <section class="login-card-wrap">
       <div class="login-card-glow" aria-hidden="true"></div>
@@ -369,7 +373,7 @@ export function registerPage(message = "") {
           <button type="submit" class="btn btn-primary btn-block btn-glow">Criar conta</button>
         </form>
         <p style="margin-top:20px;text-align:center;font-size:0.85rem;color:var(--muted)">
-          Ja tem conta? <a href="/login" style="color:#ff6b8a;font-weight:600">Entrar</a>
+          Ja tem conta? <a href="/login" style="color:#0a5cff;font-weight:600">Entrar</a>
         </p>
       </div>
     </section>

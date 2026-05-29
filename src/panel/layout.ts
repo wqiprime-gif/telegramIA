@@ -53,6 +53,7 @@ export function appLayout(
   <style>${globalStyles}</style>
 </head>
 <body>
+  <div class="light-rays" aria-hidden="true"></div>
   <canvas id="panel-scene-canvas" aria-hidden="true"></canvas>
   <div class="mesh-blob mesh-blob--app" aria-hidden="true"></div>
   <div class="ambient" aria-hidden="true"></div>

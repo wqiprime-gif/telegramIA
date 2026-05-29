@@ -1,45 +1,45 @@
-/** BotManager — Neon Pulse (inspirado em painéis de ads/bots) */
+/** BotManager — TEXTURA-inspired: preto, branco, azul forte */
 export const designSystem = {
   colors: {
-    bgBase: "#000000",
-    bgElevated: "#08080c",
-    bgSidebar: "rgba(4, 4, 8, 0.94)",
-    bgCard: "rgba(12, 12, 18, 0.85)",
-    bgCardSolid: "rgba(8, 8, 12, 0.98)",
-    bgCardHover: "rgba(20, 20, 28, 0.9)",
-    border: "rgba(255, 255, 255, 0.07)",
-    borderHighlight: "rgba(255, 45, 85, 0.35)",
-    primary: "#ff2d55",
-    primaryHover: "#ff4d6d",
-    primaryDim: "rgba(255, 45, 85, 0.12)",
-    primaryGlow: "rgba(255, 45, 85, 0.5)",
-    accentCyan: "#00d4ff",
-    accentCyanDim: "rgba(0, 212, 255, 0.1)",
-    accentViolet: "#a855f7",
-    accentVioletDim: "rgba(168, 85, 247, 0.12)",
-    accentRose: "#ff2d55",
-    accentRoseDim: "rgba(255, 45, 85, 0.12)",
-    accentMint: "#22d3a5",
-    accentMintDim: "rgba(34, 211, 165, 0.12)",
-    text: "#f5f5f7",
-    textSecondary: "#9ca3af",
-    muted: "#6b7280",
-    success: "#22d3a5",
-    successBg: "rgba(34, 211, 165, 0.12)",
-    danger: "#ff4466",
+    bgBase: "#030508",
+    bgElevated: "#060a12",
+    bgSidebar: "rgba(2, 4, 10, 0.92)",
+    bgCard: "rgba(8, 12, 22, 0.88)",
+    bgCardSolid: "rgba(6, 10, 18, 0.98)",
+    bgCardHover: "rgba(12, 18, 32, 0.95)",
+    border: "rgba(255, 255, 255, 0.08)",
+    borderHighlight: "rgba(10, 92, 255, 0.45)",
+    primary: "#0a5cff",
+    primaryHover: "#2b74ff",
+    primaryDim: "rgba(10, 92, 255, 0.14)",
+    primaryGlow: "rgba(10, 92, 255, 0.55)",
+    accentCyan: "#00b4ff",
+    accentCyanDim: "rgba(0, 180, 255, 0.12)",
+    accentViolet: "#3d7eff",
+    accentVioletDim: "rgba(61, 126, 255, 0.12)",
+    accentRose: "#0a5cff",
+    accentRoseDim: "rgba(10, 92, 255, 0.12)",
+    accentMint: "#00d4aa",
+    accentMintDim: "rgba(0, 212, 170, 0.12)",
+    text: "#ffffff",
+    textSecondary: "#a8b4c8",
+    muted: "#6b7a94",
+    success: "#00d4aa",
+    successBg: "rgba(0, 212, 170, 0.12)",
+    danger: "#ff4d6d",
     warning: "#fbbf24",
     warningBg: "rgba(251, 191, 36, 0.12)"
   },
   glass: {
-    blur: "20px",
-    saturate: "1.15",
+    blur: "24px",
+    saturate: "1.2",
     shadow:
-      "0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 0 0 1px rgba(255, 45, 85, 0.08), 0 24px 64px rgba(0, 0, 0, 0.65)"
+      "0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 0 0 1px rgba(10, 92, 255, 0.12), 0 28px 80px rgba(0, 0, 0, 0.55)"
   },
   fonts: {
-    display: "'Syne', system-ui, sans-serif",
-    sans: "'DM Sans', system-ui, sans-serif",
+    display: "'Bricolage Grotesque', system-ui, sans-serif",
+    sans: "'Instrument Sans', system-ui, sans-serif",
     mono: "'JetBrains Mono', ui-monospace, monospace"
   },
-  motion: "280ms cubic-bezier(0.22, 1, 0.36, 1)"
+  motion: "320ms cubic-bezier(0.22, 1, 0.36, 1)"
 } as const;
