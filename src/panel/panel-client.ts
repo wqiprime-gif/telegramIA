@@ -21,7 +21,10 @@ export const panelClientScript = `
 
   const LS_LAST_SALE = "panelLastSaleId";
   const LS_BELL_SEEN = "panelBellSeenAt";
+  const pageCache = new Map();
   let navigating = false;
+  let fetchCtrl = null;
+  const progress = document.getElementById("panel-nav-progress");
 
   function bindForms(root) {
     (root || document).querySelectorAll("form").forEach((f) => {
@@ -32,11 +35,12 @@ export const panelClientScript = `
         if (b) { b.disabled = true; b.textContent = "Salvando..."; }
       });
     });
+    (root || document).querySelectorAll("script[data-panel-init]").forEach((old) => old.remove());
   }
 
   function pageTitle(path) {
     if (path.startsWith("/instances/new")) return "Nova Instância";
-    if (/^\/instances\/[^/]+\/edit$/.test(path)) return "Editar instância";
+    if (/^\\/instances\\/[^/]+\\/edit$/.test(path)) return "Editar instância";
     const hit = NAV_PATHS.find(([p]) => p === path);
     return hit ? hit[1] : "BotManager";
   }
@@ -61,46 +65,80 @@ export const panelClientScript = `
     return true;
   }
 
-  async function loadPage(href, push = true) {
-    if (navigating) return;
-    navigating = true;
-    const path = href.split("?")[0];
-    main.style.opacity = "0.6";
-    try {
-      const res = await fetch(href, {
-        headers: { "X-Panel-Partial": "1" },
-        credentials: "same-origin"
-      });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const html = await res.text();
-      const isFullDoc = /<!doctype/i.test(html) || html.includes("<html");
-      if (isFullDoc) {
-        const doc = new DOMParser().parseFromString(html, "text/html");
-        const next = doc.querySelector(".content");
-        if (!next) {
-          window.location.href = href;
-          return;
-        }
-        main.innerHTML = next.innerHTML;
-        const title = doc.querySelector(".topbar h1");
-        if (title) {
-          const h = document.querySelector(".topbar h1");
-          if (h) h.textContent = title.textContent;
-        }
-      } else {
-        main.innerHTML = html;
+  function startProgress() {
+    if (progress) progress.classList.add("active");
+  }
+  function stopProgress() {
+    if (progress) progress.classList.remove("active");
+  }
+
+  function applyContent(html, path) {
+    main.innerHTML = html;
+    const h = document.querySelector(".topbar h1");
+    if (h) h.textContent = pageTitle(path);
+    setActiveNav(path);
+    bindForms(main);
+  }
+
+  async function fetchPartial(href, signal) {
+    const res = await fetch(href, {
+      headers: { "X-Panel-Partial": "1" },
+      credentials: "same-origin",
+      signal
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const html = await res.text();
+    const isFullDoc = /<!doctype/i.test(html) || html.includes("<html");
+    if (isFullDoc) {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const next = doc.querySelector(".content");
+      if (!next) throw new Error("no content");
+      const title = doc.querySelector(".topbar h1");
+      if (title) {
         const h = document.querySelector(".topbar h1");
-        if (h) h.textContent = pageTitle(path);
+        if (h) h.textContent = title.textContent;
       }
-      setActiveNav(path);
+      return next.innerHTML;
+    }
+    return html;
+  }
+
+  function prefetch(href) {
+    const path = href.split("?")[0];
+    if (pageCache.has(path)) return;
+    fetchPartial(href).then((html) => pageCache.set(path, html)).catch(() => {});
+  }
+
+  async function loadPage(href, push = true) {
+    const path = href.split("?")[0];
+    if (navigating && path === location.pathname) return;
+
+    const cached = pageCache.get(path);
+    if (cached) {
+      applyContent(cached, path);
       if (push) history.pushState({ panel: true }, "", href);
-      bindForms(main);
-      refreshLive(true);
-    } catch {
+      if (path === "/") refreshLive(true);
+      return;
+    }
+
+    if (fetchCtrl) fetchCtrl.abort();
+    fetchCtrl = new AbortController();
+    navigating = true;
+    startProgress();
+    main.classList.add("content-loading");
+
+    try {
+      const html = await fetchPartial(href, fetchCtrl.signal);
+      pageCache.set(path, html);
+      applyContent(html, path);
+      if (push) history.pushState({ panel: true }, "", href);
+      if (path === "/") refreshLive(true);
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
       window.location.href = href;
     } finally {
-      main.style.opacity = "1";
-      main.style.pointerEvents = "";
+      main.classList.remove("content-loading");
+      stopProgress();
       navigating = false;
     }
   }
@@ -113,13 +151,18 @@ export const panelClientScript = `
     loadPage(a.getAttribute("href"));
   });
 
+  document.addEventListener("mouseenter", (e) => {
+    const a = e.target.closest && e.target.closest("a");
+    if (!isInternalNavLink(a)) return;
+    prefetch(a.getAttribute("href"));
+  }, true);
+
   window.addEventListener("popstate", () => {
     loadPage(location.pathname + location.search, false);
   });
 
   bindForms(document);
 
-  /* ——— Toasts & bell ——— */
   const toastRoot = document.getElementById("panel-toasts");
   const bellBtn = document.querySelector(".icon-btn.bell-btn");
   const bellBadge = document.querySelector(".bell-badge");
@@ -175,7 +218,7 @@ export const panelClientScript = `
       document.querySelectorAll("[data-live-stat]").forEach((el) => {
         const key = el.getAttribute("data-live-stat");
         if (key === "leads") el.textContent = String(stats.leads);
-        if (key === "messagesToday") el.textContent = stats.messagesToday + " msgs hoje";
+        if (key === "messagesToday") el.textContent = stats.messagesToday + " hoje";
         if (key === "salesValue") el.textContent = money(stats.salesTotalCents);
         if (key === "salesCount") el.textContent = stats.salesCount + " venda(s)";
         if (key === "activeBots") el.textContent = String(stats.activeBots);
@@ -187,6 +230,8 @@ export const panelClientScript = `
     if (top && data.topBotsHtml) top.innerHTML = data.topBotsHtml;
     const chart = document.querySelector("[data-live=sales-chart]");
     if (chart && data.chartSvg) chart.innerHTML = data.chartSvg;
+    const msgChart = document.querySelector("[data-live=messages-chart]");
+    if (msgChart && data.messagesChartSvg) msgChart.innerHTML = data.messagesChartSvg;
     if (data.bellSales) updateBellMenu(data.bellSales);
 
     const latest = data.latestSale;
@@ -210,6 +255,7 @@ export const panelClientScript = `
   }
 
   async function refreshLive(silent) {
+    if (location.pathname !== "/") return;
     try {
       const res = await fetch("/api/panel/live", { credentials: "same-origin" });
       if (!res.ok) return;
@@ -220,10 +266,10 @@ export const panelClientScript = `
     }
   }
 
-  refreshLive(true);
+  if (location.pathname === "/") refreshLive(true);
   setInterval(() => {
-    if (document.hidden) return;
+    if (document.hidden || location.pathname !== "/") return;
     refreshLive(true);
-  }, 12000);
+  }, 15000);
 })();
 </script>`;

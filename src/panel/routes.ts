@@ -19,6 +19,7 @@ import {
   listRecentActivity,
   listSales,
   salesByDay,
+  messagesByDay,
   salesRankingByBot,
   saveProduct
 } from "../db/events.js";
@@ -32,7 +33,7 @@ import {
   requireUser,
   setSessionCookie
 } from "../lib/session.js";
-import { getApiKeyStatus, getOpenAIModel, updateOpenAISettings } from "../lib/settings.js";
+import { getApiKeyStatus, getAIProvider, getOpenAIModel, updateOpenAISettings } from "../lib/settings.js";
 import {
   leadsPage,
   mediaPage,
@@ -41,6 +42,7 @@ import {
   remarketingPage,
   salesChartSvgFromData
 } from "./pages.js";
+import { messagesChartSvgFromData } from "./charts.js";
 import { conversationsPage } from "./conversations-page.js";
 import { audiosPage } from "./audios-page.js";
 import {
@@ -55,6 +57,7 @@ import {
   settingsPage,
   topBotsRankingHtml
 } from "./ui.js";
+import { panelUserLabel } from "./layout.js";
 
 async function rowsForUser<T extends Record<string, unknown>>(rows: T[], userId: string) {
   const ids = new Set((await loadBots(userId)).map((b) => b.id));
@@ -268,6 +271,7 @@ export async function registerPanelRoutes(
       {
         stats: await dashboardStats(user.id),
         chart: await salesByDay(7, user.id),
+        messagesChart: await messagesByDay(7, user.id),
         activities: await listRecentActivity(8, user.id),
         topBots: await salesRankingByBot(5, user.id),
         leadSources: await leadSourcesStats(user.id)
@@ -275,7 +279,7 @@ export async function registerPanelRoutes(
       query.msg,
       query.t === "err",
       partial,
-      user.name
+      panelUserLabel(user)
     );
     return reply.type("text/html").send(html);
   });
@@ -286,6 +290,7 @@ export async function registerPanelRoutes(
     const bots = await loadBots(user.id);
     const stats = await dashboardStats(user.id);
     const chart = await salesByDay(7, user.id);
+    const messagesChart = await messagesByDay(7, user.id);
     const activities = await listRecentActivity(8, user.id);
     const topBots = await salesRankingByBot(5, user.id);
     const latestSale = await getLatestSale(user.id);
@@ -315,7 +320,8 @@ export async function registerPanelRoutes(
       },
       activityHtml: activityFeedHtml(activities),
       topBotsHtml: topBotsRankingHtml(topBots),
-      chartSvg: salesChartSvgFromData(chart),
+      chartSvg: salesChartSvgFromData(chart, { tall: true }),
+      messagesChartSvg: messagesChartSvgFromData(messagesChart),
       latestSale: latestSale
         ? { id: latestSale.id, subtitle: latestSale.subtitle }
         : null,
@@ -526,7 +532,7 @@ export async function registerPanelRoutes(
     const query = z.object({ msg: z.string().optional(), t: z.string().optional() }).parse(request.query);
     return reply
       .type("text/html")
-      .send(instancesPage(await loadBots(user.id), query.msg, query.t === "err", isPartial(request), user.name));
+      .send(instancesPage(await loadBots(user.id), query.msg, query.t === "err", isPartial(request), panelUserLabel(user)));
   });
 
   app.get("/instances/new", async (request, reply) => {
@@ -535,7 +541,7 @@ export async function registerPanelRoutes(
     const query = z.object({ msg: z.string().optional(), t: z.string().optional() }).parse(request.query);
     return reply
       .type("text/html")
-      .send(newInstancePage(query.msg, query.t === "err", isPartial(request), user.name));
+      .send(newInstancePage(query.msg, query.t === "err", isPartial(request), panelUserLabel(user)));
   });
 
   app.get("/instances/:id/edit", async (request, reply) => {
@@ -547,7 +553,7 @@ export async function registerPanelRoutes(
     const query = z.object({ msg: z.string().optional(), t: z.string().optional() }).parse(request.query);
     return reply
       .type("text/html")
-      .send(editInstancePage(bot, query.msg, query.t === "err", isPartial(request), user.name));
+      .send(editInstancePage(bot, query.msg, query.t === "err", isPartial(request), panelUserLabel(user)));
   });
 
   app.post("/instances/:id", async (request, reply) => {
@@ -604,6 +610,7 @@ export async function registerPanelRoutes(
     const query = z.object({ msg: z.string().optional(), t: z.string().optional() }).parse(request.query);
     const status = await getApiKeyStatus(user.id);
     const model = await getOpenAIModel(user.id);
+    const provider = await getAIProvider(user.id);
     return reply.type("text/html").send(
       settingsPage(
         {
@@ -612,10 +619,12 @@ export async function registerPanelRoutes(
           maskedKey: status.masked,
           configured: status.configured,
           source: status.source,
-          model
+          model,
+          provider,
+          providerLabel: status.providerLabel
         },
         isPartial(request),
-        user.name
+        panelUserLabel(user)
       )
     );
   });
@@ -625,9 +634,17 @@ export async function registerPanelRoutes(
     if (!user) return;
     try {
       const body = z
-        .object({ openaiApiKey: z.string().optional(), openaiModel: z.string().optional() })
+        .object({
+          openaiApiKey: z.string().optional(),
+          openaiModel: z.string().optional(),
+          aiProvider: z.string().optional()
+        })
         .parse(request.body ?? {});
-      await updateOpenAISettings(user.id, { apiKey: body.openaiApiKey, model: body.openaiModel });
+      await updateOpenAISettings(user.id, {
+        apiKey: body.openaiApiKey,
+        model: body.openaiModel,
+        provider: body.aiProvider
+      });
       return reply.redirect(flashRedirect("/settings", "Configurações salvas!"));
     } catch (error) {
       return reply.redirect(flashRedirect("/settings", `Erro: ${errorMessage(error)}`, "err"));

@@ -66,7 +66,6 @@ function mediaChips(urls: string[], label: string) {
 export function botInstanceForm(mode: "new" | "edit", bot?: BotConfig) {
   const isEdit = mode === "edit" && bot;
   const action = isEdit ? `/instances/${bot.id}` : "/bots";
-  const price = isEdit ? (bot.productPriceCents / 100).toFixed(2) : "97";
   const activeTrue = !isEdit || bot.active;
   const paymentPix = !isEdit || bot.paymentMethod !== "laranjinha";
   const delay = delayPartsFromMs(isEdit ? bot.messageDelayMs : 4000);
@@ -200,12 +199,6 @@ export function botInstanceForm(mode: "new" | "edit", bot?: BotConfig) {
         </label>
         <label class="field">API Key Laranjinha <small style="color:var(--muted)">se gateway</small>
           <input name="laranjinhaApiKey" type="password" placeholder="${isEdit ? "Deixe vazio para manter a atual" : "sua chave API"}" autocomplete="off" />
-        </label>
-        <label class="field">Produto / plano
-          <input name="productName" value="${isEdit ? escapeHtml(bot.productName) : "VIP Gold"}" required />
-        </label>
-        <label class="field">Preço (R$)
-          <input name="productPrice" type="number" step="0.01" min="1" value="${price}" required />
         </label>
       </div>
       <button type="submit" class="btn btn-primary btn-block" style="margin-top:12px">

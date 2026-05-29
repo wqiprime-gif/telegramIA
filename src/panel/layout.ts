@@ -18,6 +18,14 @@ export type NavId =
   | "audios"
   | "remarketing";
 
+export function panelUserLabel(input: { name: string; email: string }) {
+  const email = input.email?.trim();
+  if (email) return email;
+  const name = input.name?.trim();
+  if (!name || name.startsWith("@")) return "Conta";
+  return name;
+}
+
 export function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -54,6 +62,7 @@ export function appLayout(
 </head>
 <body>
   <div class="light-rays" aria-hidden="true"></div>
+  <div id="panel-nav-progress" class="panel-nav-progress" aria-hidden="true"></div>
   <canvas id="panel-scene-canvas" aria-hidden="true"></canvas>
   <div class="mesh-blob mesh-blob--app" aria-hidden="true"></div>
   <div class="ambient" aria-hidden="true"></div>

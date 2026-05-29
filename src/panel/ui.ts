@@ -4,9 +4,11 @@ import { botInstanceForm, instancesTableHtml } from "./bot-form.js";
 import { icons } from "./icons.js";
 import { alertHtml, appLayout, escapeHtml } from "./layout.js";
 import { brandMarkHtml } from "./brand.js";
-import { salesChartSvgFromData } from "./pages.js";
+import { salesChartSvgFromData, messagesChartSvgFromData, leadSourcesBarSvg } from "./charts.js";
 import { globalStyles } from "./styles.js";
 import { panelSceneScript } from "./panel-scene.js";
+import { loginLightningScript } from "./panel-lightning.js";
+import { AI_PROVIDERS, type AIProviderId } from "../lib/ai-providers.js";
 import type { LeadSourceStat } from "../db/events.js";
 import { sourceEmoji, sourceLabel } from "../lib/lead-source.js";
 
@@ -18,6 +20,7 @@ export type DashboardData = {
     messagesToday: number;
   };
   chart: { day: string; totalCents: number }[];
+  messagesChart: { day: string; count: number }[];
   activities: ActivityItem[];
   topBots: BotSalesRank[];
   leadSources: LeadSourceStat[];
@@ -129,6 +132,7 @@ export function loginPage(message = "") {
 </head>
 <body class="auth-body">
   <div class="light-rays" aria-hidden="true"></div>
+  <canvas id="login-lightning-canvas" aria-hidden="true"></canvas>
   <canvas id="panel-scene-canvas" aria-hidden="true"></canvas>
   <div class="mesh-blob" aria-hidden="true"></div>
   <main class="login-premium">
@@ -171,6 +175,7 @@ export function loginPage(message = "") {
     </section>
   </main>
   <script>${panelSceneScript("auth")}</script>
+  <script>${loginLightningScript()}</script>
 </body>
 </html>`;
 }
@@ -192,13 +197,34 @@ export function dashboardPage(
     ${message ? alertHtml(message, isError ? "error" : "success") : ""}
     <div class="dash-hero-pro">
       <div>
-        <p class="eyebrow">Visão geral · ${escapeHtml(userName)}</p>
+        <p class="eyebrow">Visão geral operacional</p>
         <h2>Central de operação</h2>
         <p>Métricas consolidadas das suas instâncias Telegram — leads, conversões, conversas e remarketing em um único painel.</p>
       </div>
       <div class="dash-hero-actions">
         <a href="/instances/new" class="btn btn-primary">${icons.plus} Nova instância</a>
         <a href="/conversations" class="btn btn-secondary">${icons.chat} Abrir conversas</a>
+      </div>
+    </div>
+
+    <div class="dash-charts-hero">
+      <div class="card card-premium chart-card-pro">
+        <div class="card-head">
+          <h3>${icons.card} Receita — 7 dias</h3>
+          <span class="chart-badge" data-live-stat="salesValue">R$ ${salesReais}</span>
+        </div>
+        <div class="card-body chart-wrap chart-wrap--hero" data-live="sales-chart">
+          ${salesChartSvgFromData(data.chart, { tall: true })}
+        </div>
+      </div>
+      <div class="card card-premium chart-card-pro">
+        <div class="card-head">
+          <h3>${icons.chat} Mensagens — 7 dias</h3>
+          <span class="chart-badge" data-live-stat="messagesToday">${data.stats.messagesToday} hoje</span>
+        </div>
+        <div class="card-body chart-wrap chart-wrap--hero" data-live="messages-chart">
+          ${messagesChartSvgFromData(data.messagesChart)}
+        </div>
       </div>
     </div>
 
@@ -248,11 +274,17 @@ export function dashboardPage(
       </div>
     </div>
 
-    <div class="grid-2" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-bottom:16px">
+    <div class="dash-analytics-row">
       <div class="card card-premium">
         <div class="card-head"><h3>Origem dos leads</h3></div>
-        <div class="card-body" data-live="lead-sources">${leadSourcesGridHtml(data.leadSources)}</div>
+        <div class="card-body" data-live="lead-sources-bars">${leadSourcesBarSvg(
+          data.leadSources.map((s) => ({ source: sourceLabel(s.source), count: s.count }))
+        )}</div>
         <div class="card-foot"><a href="/leads" class="card-link">Ver leads →</a></div>
+      </div>
+      <div class="card card-premium">
+        <div class="card-head"><h3>Top instâncias</h3></div>
+        <div class="card-body" data-live="top-bots">${topProducts(data.topBots)}</div>
       </div>
       <div class="card card-premium">
         <div class="card-head"><h3>Atalhos</h3></div>
@@ -260,18 +292,10 @@ export function dashboardPage(
           <div class="quick-grid">
             <a href="/instances/new" class="quick-item">${icons.sparkles} Prompt IA</a>
             <a href="/conversations" class="quick-item">${icons.chat} Conversas</a>
-            <a href="/instances/new" class="quick-item">${icons.pix} Pix</a>
-            <a href="/settings" class="quick-item">${icons.settings} OpenAI</a>
+            <a href="/settings" class="quick-item">${icons.settings} Provedor IA</a>
+            <a href="/remarketing" class="quick-item">${icons.megaphone} Remarketing</a>
           </div>
         </div>
-      </div>
-      <div class="card card-premium">
-        <div class="card-head"><h3>Vendas — 7 dias</h3></div>
-        <div class="card-body chart-wrap" data-live="sales-chart">${salesChartSvgFromData(data.chart)}</div>
-      </div>
-      <div class="card card-premium">
-        <div class="card-head"><h3>Top instâncias</h3></div>
-        <div class="card-body" data-live="top-bots">${topProducts(data.topBots)}</div>
       </div>
     </div>
     </div>`;
@@ -348,6 +372,7 @@ export function registerPage(message = "") {
 </head>
 <body class="auth-body">
   <div class="light-rays" aria-hidden="true"></div>
+  <canvas id="login-lightning-canvas" aria-hidden="true"></canvas>
   <canvas id="panel-scene-canvas" aria-hidden="true"></canvas>
   <div class="mesh-blob" aria-hidden="true"></div>
   <main class="login-premium">
@@ -379,6 +404,7 @@ export function registerPage(message = "") {
     </section>
   </main>
   <script>${panelSceneScript("auth")}</script>
+  <script>${loginLightningScript()}</script>
 </body>
 </html>`;
 }
@@ -391,32 +417,48 @@ export function settingsPage(
     configured: boolean;
     source: string;
     model: string;
+    provider: AIProviderId;
+    providerLabel: string;
   },
   partial = false,
   userName = "Usuario"
 ) {
   const statusClass = input.configured ? "badge-online" : "badge-paused";
-  const statusText = input.configured ? `Conectado (${input.source})` : "Não configurado";
+  const statusText = input.configured ? `Conectado · ${escapeHtml(input.providerLabel)}` : "Não configurado";
+  const providerOptions = Object.entries(AI_PROVIDERS)
+    .map(
+      ([id, p]) =>
+        `<option value="${id}" ${input.provider === id ? "selected" : ""}>${escapeHtml(p.label)}</option>`
+    )
+    .join("");
+  const hint = AI_PROVIDERS[input.provider]?.keyHint ?? "sk-...";
 
   const body = `
     ${input.message ? alertHtml(input.message, input.messageIsError ? "error" : "success") : ""}
     <div class="grid-2">
-      <div class="card">
+      <div class="card card-premium">
         <div class="card-head">
-          <h3>${icons.sparkles} OpenAI / ChatGPT</h3>
+          <h3>${icons.sparkles} Provedor de IA</h3>
           <span class="badge ${statusClass}"><span class="badge-dot"></span> ${statusText}</span>
         </div>
         <div class="card-body">
           ${input.configured ? `<p style="font-family:var(--mono);font-size:0.88rem;color:var(--primary);margin-bottom:16px;padding:12px;background:#0a0c12;border-radius:10px;border:1px solid var(--border)">${escapeHtml(input.maskedKey)}</p>` : ""}
-          <form method="post" action="/settings">
-            <label class="field">API Key OpenAI
-              <input name="openaiApiKey" type="password" placeholder="sk-proj-..." autocomplete="new-password" />
+          <form method="post" action="/settings" id="ai-settings-form">
+            <label class="field">Provedor
+              <select name="aiProvider" id="ai-provider-select">
+                ${providerOptions}
+              </select>
+            </label>
+            <label class="field">API Key
+              <input name="openaiApiKey" type="password" placeholder="${escapeHtml(hint)}" autocomplete="new-password" />
+              <small style="color:var(--muted)">Deixe vazio para manter a chave atual.</small>
             </label>
             <label class="field">Modelo
-              <input name="openaiModel" value="${escapeHtml(input.model)}" placeholder="gpt-4o-mini" />
+              <input name="openaiModel" value="${escapeHtml(input.model)}" placeholder="${escapeHtml(AI_PROVIDERS[input.provider].defaultModel)}" />
             </label>
             <button type="submit" class="btn btn-primary btn-block">Salvar configurações</button>
           </form>
+          <p class="form-hint" style="margin-top:14px">Suporta OpenAI, DeepSeek, Google Gemini e Anthropic Claude.</p>
         </div>
       </div>
       <div class="card">

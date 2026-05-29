@@ -63,8 +63,11 @@ export async function initUsersSchema() {
         user_id UUID PRIMARY KEY REFERENCES panel_users(id) ON DELETE CASCADE,
         openai_api_key_encrypted TEXT,
         openai_model TEXT NOT NULL DEFAULT 'gpt-4o-mini',
+        ai_provider TEXT NOT NULL DEFAULT 'openai',
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+
+      ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS ai_provider TEXT NOT NULL DEFAULT 'openai';
 
       ALTER TABLE bots ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES panel_users(id) ON DELETE CASCADE;
       ALTER TABLE bots ADD COLUMN IF NOT EXISTS avatar_url TEXT NOT NULL DEFAULT '';

@@ -595,6 +595,46 @@ export async function salesByDay(days = 7, userId?: string) {
   return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, totalCents]) => ({ day, totalCents }));
 }
 
+export async function messagesByDay(days = 7, userId?: string) {
+  const botIds = await botIdsForUser(userId);
+  if (userId && botIds && botIds.length === 0) return [];
+
+  if (useDatabase()) {
+    const { rows } = botIds
+      ? await getPool().query<{ day: string; total: string }>(
+          `SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day,
+                  COUNT(*)::text AS total
+           FROM conversation_messages
+           WHERE created_at >= NOW() - ($1::int || ' days')::interval
+             AND bot_id = ANY($2::uuid[])
+           GROUP BY 1 ORDER BY 1`,
+          [days, botIds]
+        )
+      : await getPool().query<{ day: string; total: string }>(
+          `SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day,
+                  COUNT(*)::text AS total
+           FROM conversation_messages
+           WHERE created_at >= NOW() - ($1::int || ' days')::interval
+           GROUP BY 1 ORDER BY 1`,
+          [days]
+        );
+    return rows.map((r) => ({ day: r.day, count: Number(r.total) }));
+  }
+
+  const store = await loadFileStore();
+  const map = new Map<string, number>();
+  const cutoff = Date.now() - days * 86400000;
+  const rows = botIds
+    ? store.messages.filter((m) => botIds.includes(m.botId))
+    : store.messages;
+  for (const m of rows) {
+    if (new Date(m.createdAt).getTime() < cutoff) continue;
+    const day = m.createdAt.slice(0, 10);
+    map.set(day, (map.get(day) ?? 0) + 1);
+  }
+  return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, count]) => ({ day, count }));
+}
+
 export type ActivityItem = {
   id: string;
   type: "sale" | "lead" | "receipt";

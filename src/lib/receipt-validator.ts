@@ -1,4 +1,5 @@
-import { getOpenAI, getOpenAIModel } from "./settings.js";
+import { createChatCompletion } from "./ai-chat.js";
+import { getOpenAIModel } from "./settings.js";
 
 export type ReceiptVerdict = {
   paid: boolean;
@@ -27,9 +28,8 @@ Nao corrija nomes, nao interprete. Se ilegivel escreva "Nao visivel".
 Responda apenas JSON: {"transcript": "texto completo aqui"}`;
 
 export async function ocrReceiptImage(imageUrl: string, userId: string) {
-  const openai = await getOpenAI(userId);
   const model = await getOpenAIModel(userId);
-  const completion = await openai.chat.completions.create({
+  const completion = await createChatCompletion(userId, {
     model,
     temperature: 0,
     response_format: { type: "json_object" },
@@ -60,13 +60,12 @@ export async function validateReceiptTranscript(input: {
     return { paid: false, confidence: 0, reason: "Nao foi possivel ler o comprovante.", transcript: text };
   }
 
-  const openai = await getOpenAI(input.userId);
   const model = await getOpenAIModel(input.userId);
   const amountHint = input.expectedAmountCents
     ? `Valor esperado aproximado: R$ ${(input.expectedAmountCents / 100).toFixed(2)}.`
     : "";
 
-  const completion = await openai.chat.completions.create({
+  const completion = await createChatCompletion(input.userId, {
     model,
     temperature: 0,
     response_format: { type: "json_object" },

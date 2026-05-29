@@ -76,8 +76,8 @@ export function productsPage(
     <div class="card card-accent-gold" style="margin-bottom:16px">
       <div class="card-body" style="font-size:0.88rem;color:var(--text-2);line-height:1.6">
         <strong>O que é Produtos?</strong> Catálogo extra por instância (nome + preço) para você organizar planos no painel.
-        O preço que o bot cobra no Pix hoje vem da instância em <em>Editar instância → Produto / plano</em>.
-        Use esta tela quando tiver vários produtos no mesmo bot.
+        O preço e pacotes do bot são definidos pelo fluxo de vendas (prompt + negociação Byanca).
+        Use esta tela para organizar catálogo extra por instância quando tiver vários planos.
       </div>
     </div>
     <div class="grid-2">
@@ -220,28 +220,4 @@ export function mediaPage(bots: BotConfig[], partial?: boolean) {
   return wrap("Mídias", "media", body.replaceAll("<div", "<div").replaceAll("</div>", "</div>"), partial);
 }
 
-export function salesChartSvgFromData(points: { day: string; totalCents: number }[]) {
-  const days: string[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    days.push(d.toISOString().slice(0, 10));
-  }
-  const values = days.map((day) => points.find((p) => p.day === day)?.totalCents ?? 0);
-  const max = Math.max(...values, 1);
-  const w = 400;
-  const h = 140;
-  const coords = values.map((v, i) => {
-    const x = (i / 6) * w;
-    const y = h - (v / max) * (h - 20);
-    return `${x},${y}`;
-  });
-  const area = `M0,${h} ${coords.map((c, i) => `L${c.split(",")[0]},${c.split(",")[1]}`).join(" ")} L${w},${h} Z`;
-  return `<svg class="chart-svg" viewBox="0 0 ${w} ${h + 20}" preserveAspectRatio="none">
-    <path d="${area}" fill="rgba(42,171,238,0.2)"/>
-    <polyline points="${coords.join(" ")}" fill="none" stroke="#2aabee" stroke-width="3" stroke-linecap="round"/>
-  </svg>
-  <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:0.72rem;color:var(--muted)">
-    ${days.map((d) => `<span>${d.slice(5)}</span>`).join("")}
-  </div>`;
-}
+export { salesChartSvgFromData, messagesChartSvgFromData, leadSourcesBarSvg } from "./charts.js";

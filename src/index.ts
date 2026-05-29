@@ -57,7 +57,8 @@ import {
   validateReceiptFromText,
   type ReceiptVerdict
 } from "./lib/receipt-validator.js";
-import { getOpenAI, getOpenAIModel } from "./lib/settings.js";
+import { createChatCompletion } from "./lib/ai-chat.js";
+import { getOpenAIModel } from "./lib/settings.js";
 import {
   humanReadingPause,
   humanSendMediaList,
@@ -505,9 +506,8 @@ async function startBot(config: BotConfig) {
     const isFirstTurn = history.filter((m) => m.role === "user").length === 0;
 
     try {
-      const openai = await getOpenAI(config.userId);
       const model = await getOpenAIModel(config.userId);
-      const completion = await openai.chat.completions.create({
+      const completion = await createChatCompletion(config.userId, {
         model,
         temperature: 0.75,
         messages: [
@@ -598,7 +598,7 @@ Audios: ${audioLibraryPrompt(library)}.`
         ctx.telegram,
         chatId,
         config,
-        "IA indisponivel. Configure a OpenAI API Key em Configuracoes no painel."
+        "IA indisponivel. Configure a API Key em Configuracoes no painel."
       );
     }
   });
