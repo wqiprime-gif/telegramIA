@@ -1,7 +1,8 @@
-# Deploy automático no Railway a cada push na main.
-# Configure em GitHub → Settings → Secrets and variables → Actions:
-#   RAILWAY_TOKEN  = token em https://railway.com/account/tokens
-#   RAILWAY_SERVICE_ID = ID do serviço telegramIA (Settings → General)
+# Build em todo push na main. Deploy no Railway só se os secrets estiverem configurados.
+# Secrets: GitHub → Settings → Secrets and variables → Actions
+#   RAILWAY_TOKEN        → https://railway.com/account/tokens
+#   RAILWAY_SERVICE_ID   → Railway → serviço → Settings → General → Service ID
+# Guia: DEPLOY-RAILWAY.md
 
 name: Deploy Railway
 
@@ -15,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,13 +32,27 @@ jobs:
       - name: Build
         run: npm run build
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ secrets.RAILWAY_TOKEN != '' && secrets.RAILWAY_SERVICE_ID != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
       - name: Deploy to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway redeploy --service "${{ secrets.RAILWAY_SERVICE_ID }}" --yes
+
+  deploy-skipped-hint:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ secrets.RAILWAY_TOKEN == '' || secrets.RAILWAY_SERVICE_ID == '' }}
+    steps:
+      - name: Secrets ausentes (deploy não rodou)
         run: |
-          test -n "$RAILWAY_TOKEN" || (echo "Falta secret RAILWAY_TOKEN — leia DEPLOY-RAILWAY.md" && exit 1)
-          test -n "${{ secrets.RAILWAY_SERVICE_ID }}" || (echo "Falta secret RAILWAY_SERVICE_ID" && exit 1)
-          railway redeploy --service "${{ secrets.RAILWAY_SERVICE_ID }}" --yes
+          echo "::warning::Configure RAILWAY_TOKEN e RAILWAY_SERVICE_ID em GitHub → Settings → Secrets → Actions"
+          echo "Leia DEPLOY-RAILWAY.md — ou faça redeploy manual no painel Railway (Deployments → Deploy latest commit)."
