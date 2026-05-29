@@ -53,7 +53,8 @@ export function appLayout(
   <style>${globalStyles}</style>
 </head>
 <body>
-  <div class="panel-scene-wrap panel-scene-wrap--app" aria-hidden="true"><canvas id="panel-scene-canvas"></canvas></div>
+  <canvas id="panel-scene-canvas" aria-hidden="true"></canvas>
+  <div class="mesh-blob mesh-blob--app" aria-hidden="true"></div>
   <div class="ambient" aria-hidden="true"></div>
   <div class="app">
     <aside class="sidebar">
@@ -102,7 +103,7 @@ export function appLayout(
   </div>
   <div id="panel-toasts" class="panel-toasts"></div>
 ${panelClientScript}
-  <script>${panelSceneScript()}</script>
+  <script>${panelSceneScript("app")}</script>
 </body>
 </html>`;
 }

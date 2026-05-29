@@ -127,26 +127,29 @@ export function loginPage(message = "") {
   <title>Login · BotManager</title>
   <style>${globalStyles}</style>
 </head>
-<body>
-  <div class="panel-scene-wrap" aria-hidden="true"><canvas id="panel-scene-canvas"></canvas></div>
-  <div class="ambient" aria-hidden="true"></div>
-  <div class="login-page">
-    <div class="login-hero">
+<body class="auth-body">
+  <canvas id="panel-scene-canvas" aria-hidden="true"></canvas>
+  <div class="mesh-blob" aria-hidden="true"></div>
+  <main class="login-premium">
+    <section class="login-showcase">
       ${brandMarkHtml("Painel Telegram")}
-      <h1><span class="brand-accent">Bots</span> que vendem no automático</h1>
-      <p style="color:var(--text-2);line-height:1.65;max-width:440px">
-        IA humanizada, áudios por gatilho, Pix, comprovantes, chat no painel e remarketing — visual premium com WebGL.
+      <h1>Venda no automático com <em>IA + WebGL</em></h1>
+      <p class="login-tagline">
+        Painel premium para bots Telegram: conversas ao vivo, Pix, comprovantes,
+        remarketing e fluxo Byanca — tudo em um lugar.
       </p>
-      <div class="login-pills">
-        <span class="login-pill">Áudios inteligentes</span>
-        <span class="login-pill">Remarketing 1:1</span>
-        <span class="login-pill">Pix + IA</span>
+      <div class="login-features">
+        <span class="login-feature">Chat estilo Telegram</span>
+        <span class="login-feature">3D em tempo real</span>
+        <span class="login-feature">Pix + IA</span>
+        <span class="login-feature">Remarketing</span>
       </div>
-    </div>
-    <div class="login-form">
-      <div class="login-box">
-        <h2>Bem-vindo de volta</h2>
-        <p style="color:var(--muted);margin-bottom:24px">Entre na sua conta BotManager</p>
+    </section>
+    <section class="login-card-wrap">
+      <div class="login-card-glow" aria-hidden="true"></div>
+      <div class="login-card-premium">
+        <h2>Entrar</h2>
+        <p class="sub">Acesse seu painel BotManager</p>
         ${message ? alertHtml(message, "error") : ""}
         <form method="post" action="/login">
           <label class="field">E-mail
@@ -155,15 +158,15 @@ export function loginPage(message = "") {
           <label class="field">Senha
             <input name="password" type="password" placeholder="••••••••" required />
           </label>
-          <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px">Entrar no painel</button>
+          <button type="submit" class="btn btn-primary btn-block btn-glow">Entrar no painel</button>
         </form>
-        <p style="margin-top:16px;text-align:center;font-size:0.85rem;color:var(--muted)">
-          Nao tem conta? <a href="/register" style="color:var(--primary)">Criar conta</a>
+        <p style="margin-top:20px;text-align:center;font-size:0.85rem;color:var(--muted)">
+          Nao tem conta? <a href="/register" style="color:#ff6b8a;font-weight:600">Criar conta</a>
         </p>
       </div>
-    </div>
-  </div>
-  <script>${panelSceneScript()}</script>
+    </section>
+  </main>
+  <script>${panelSceneScript("auth")}</script>
 </body>
 </html>`;
 }
@@ -182,16 +185,27 @@ export function dashboardPage(
 
   const body = `
     ${message ? alertHtml(message, isError ? "error" : "success") : ""}
-    <div class="stats-row">
-      <div class="stat-card">
+    <div class="dash-hero">
+      <div>
+        <h2>Olá, ${escapeHtml(userName.split(" ")[0] || "bem-vindo")} 👋</h2>
+        <p>Central de bots Telegram — instâncias, conversas, vendas e remarketing em um painel premium.</p>
+      </div>
+      <div class="dash-hero-actions">
+        <a href="/instances/new" class="btn btn-primary">${icons.plus} Nova instância</a>
+        <a href="/conversations" class="btn btn-secondary">${icons.chat} Abrir conversas</a>
+      </div>
+    </div>
+
+    <div class="stats-row-premium">
+      <div class="stat-card-premium">
         <div class="stat-icon purple">${icons.layers}</div>
         <div>
-          <div class="stat-label">Instâncias Ativas</div>
+          <div class="stat-label">Instâncias ativas</div>
           <div class="stat-value">${active}</div>
           <div class="stat-delta">${bots.length} cadastrada(s)</div>
         </div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card-premium">
         <div class="stat-icon green">${icons.users}</div>
         <div>
           <div class="stat-label">Leads</div>
@@ -199,7 +213,7 @@ export function dashboardPage(
           <div class="stat-delta" data-live-stat="messagesToday">${data.stats.messagesToday} msgs hoje</div>
         </div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card-premium">
         <div class="stat-icon blue">${icons.card}</div>
         <div>
           <div class="stat-label">Vendas</div>
@@ -207,60 +221,58 @@ export function dashboardPage(
           <div class="stat-delta" data-live-stat="salesCount">${data.stats.salesCount} venda(s)</div>
         </div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card-premium">
         <div class="stat-icon orange">${icons.chat}</div>
         <div>
-          <div class="stat-label">Mídias</div>
+          <div class="stat-label">Prévias</div>
           <div class="stat-value">${previews}</div>
-          <div class="stat-delta">prévias configuradas</div>
+          <div class="stat-delta">mídias configuradas</div>
         </div>
       </div>
     </div>
 
     <div class="grid-2">
-      <div class="card card--table">
+      <div class="card card-premium card--table">
         <div class="card-head">
-          <h3>Suas Instâncias</h3>
+          <h3>Suas instâncias</h3>
           <form method="post" action="/restart" style="display:inline">
             <button type="submit" class="btn btn-secondary btn-sm">${icons.refresh} Reiniciar</button>
           </form>
         </div>
         <div class="card-body card-body--flush">${instancesTableHtml(bots)}</div>
         <div class="card-foot">
-          <a href="/instances" class="card-link">Ver todas as instâncias →</a>
+          <a href="/instances" class="card-link">Ver todas →</a>
         </div>
       </div>
-      <div class="card">
-        <div class="card-head"><h3>Atividades Recentes</h3></div>
+      <div class="card card-premium">
+        <div class="card-head"><h3>Atividades recentes</h3></div>
         <div class="card-body" data-live="activity-feed">${activityFeed(data.activities)}</div>
       </div>
     </div>
 
     <div class="grid-2" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
-      <div class="card">
+      <div class="card card-premium">
         <div class="card-head"><h3>Origem dos leads</h3></div>
         <div class="card-body" data-live="lead-sources">${leadSourcesGridHtml(data.leadSources)}</div>
-        <div class="card-foot"><a href="/leads" class="card-link">Ver todos os leads →</a></div>
+        <div class="card-foot"><a href="/leads" class="card-link">Ver leads →</a></div>
       </div>
-      <div class="card">
-        <div class="card-head"><h3>Configuração Rápida</h3></div>
+      <div class="card card-premium">
+        <div class="card-head"><h3>Atalhos</h3></div>
         <div class="card-body">
           <div class="quick-grid">
-            <a href="/instances/new" class="quick-item">${icons.sparkles} Prompt da IA</a>
-            <a href="/instances/new" class="quick-item">${icons.pix} Chave Pix</a>
-            <a href="/instances/new" class="quick-item">${icons.box} Mídias</a>
-            <a href="/settings" class="quick-item">${icons.settings} OpenAI Key</a>
-            <a href="/instances/new" class="quick-item">${icons.upload} Upload</a>
-            <a href="/settings" class="quick-item">${icons.lock} Segurança</a>
+            <a href="/instances/new" class="quick-item">${icons.sparkles} Prompt IA</a>
+            <a href="/conversations" class="quick-item">${icons.chat} Conversas</a>
+            <a href="/instances/new" class="quick-item">${icons.pix} Pix</a>
+            <a href="/settings" class="quick-item">${icons.settings} OpenAI</a>
           </div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-head"><h3>Vendas — Últimos 7 dias</h3></div>
+      <div class="card card-premium">
+        <div class="card-head"><h3>Vendas — 7 dias</h3></div>
         <div class="card-body chart-wrap" data-live="sales-chart">${salesChartSvgFromData(data.chart)}</div>
       </div>
-      <div class="card">
-        <div class="card-head"><h3>Top Instâncias</h3></div>
+      <div class="card card-premium">
+        <div class="card-head"><h3>Top instâncias</h3></div>
         <div class="card-body" data-live="top-bots">${topProducts(data.topBots)}</div>
       </div>
     </div>`;
@@ -335,32 +347,34 @@ export function registerPage(message = "") {
   <title>Criar conta · BotManager</title>
   <style>${globalStyles}</style>
 </head>
-<body>
-  <div class="panel-scene-wrap" aria-hidden="true"><canvas id="panel-scene-canvas"></canvas></div>
-  <div class="ambient" aria-hidden="true"></div>
-  <div class="login-page">
-    <div class="login-hero">
-      <div class="sidebar-brand" style="padding:0 0 24px"><div class="logo">BM</div> BotManager</div>
-      <h1>Seu painel de bots com IA</h1>
-      <p style="color:var(--text-2);line-height:1.6;max-width:420px">Crie sua conta e gerencie bots Telegram com Pix e entrega automática.</p>
-    </div>
-    <div class="login-form">
-      <div class="login-box">
+<body class="auth-body">
+  <canvas id="panel-scene-canvas" aria-hidden="true"></canvas>
+  <div class="mesh-blob" aria-hidden="true"></div>
+  <main class="login-premium">
+    <section class="login-showcase">
+      ${brandMarkHtml("Painel Telegram")}
+      <h1>Crie sua conta <em>premium</em></h1>
+      <p class="login-tagline">Gerencie bots com IA, chat no painel e visual 3D em tempo real.</p>
+    </section>
+    <section class="login-card-wrap">
+      <div class="login-card-glow" aria-hidden="true"></div>
+      <div class="login-card-premium">
         <h2>Criar conta</h2>
+        <p class="sub">Comece em menos de 1 minuto</p>
         ${message ? alertHtml(message, "error") : ""}
         <form method="post" action="/register">
           <label class="field">Seu nome<input name="name" required /></label>
           <label class="field">E-mail<input name="email" type="email" required /></label>
           <label class="field">Senha<input name="password" type="password" minlength="6" required /></label>
-          <button type="submit" class="btn btn-primary btn-block">Criar conta</button>
+          <button type="submit" class="btn btn-primary btn-block btn-glow">Criar conta</button>
         </form>
-        <p style="margin-top:16px;text-align:center;font-size:0.85rem;color:var(--muted)">
-          Ja tem conta? <a href="/login" style="color:var(--primary)">Entrar</a>
+        <p style="margin-top:20px;text-align:center;font-size:0.85rem;color:var(--muted)">
+          Ja tem conta? <a href="/login" style="color:#ff6b8a;font-weight:600">Entrar</a>
         </p>
       </div>
-    </div>
-  </div>
-  <script>${panelSceneScript()}</script>
+    </section>
+  </main>
+  <script>${panelSceneScript("auth")}</script>
 </body>
 </html>`;
 }
