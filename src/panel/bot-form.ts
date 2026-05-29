@@ -1,4 +1,6 @@
 import type { BotConfig } from "../bots.js";
+import { BYANCA_PROMPT_TELEGRAM } from "../lib/prompt-byanca.js";
+import { LEAD_SOURCES, sourceLabel, trackingLink } from "../lib/lead-source.js";
 import { icons } from "./icons.js";
 import { botHandle, botInitials, escapeHtml } from "./layout.js";
 
@@ -156,8 +158,34 @@ export function botInstanceForm(mode: "new" | "edit", bot?: BotConfig) {
         </div>
 
         <label class="field span-2" id="prompt">Prompt / persona da IA
-          <textarea name="prompt" required>${isEdit ? escapeHtml(bot.prompt) : "Voce atende leads no Telegram de forma simpatica, curta e persuasiva. Quando pedirem previa, ofereca. Quando pedirem Pix, informe a chave."}</textarea>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-byanca-prompt">Usar prompt Byanca (oficial)</button>
+          </div>
+          <script type="application/json" id="byanca-prompt-data">${escapeHtml(JSON.stringify(BYANCA_PROMPT_TELEGRAM))}</script>
+          <textarea name="prompt" required>${isEdit ? escapeHtml(bot.prompt) : escapeHtml(BYANCA_PROMPT_TELEGRAM)}</textarea>
         </label>
+        <div class="field span-2 card" style="padding:16px;margin-top:4px">
+          <h4 style="font-family:var(--font-display);margin-bottom:8px">Rastrear origem do lead (TikTok, Instagram…)</h4>
+          <p class="form-hint">Coloque estes links na bio de cada rede. Troque <strong>SEU_BOT</strong> pelo @ do bot no Telegram.</p>
+          <div class="tracking-links">
+            ${LEAD_SOURCES.filter((s) => s !== "unknown" && s !== "organic")
+              .map(
+                (s) =>
+                  `<div><span class="source-badge ${s}">${sourceLabel(s)}</span><br/>
+              <code class="tracking-link">${escapeHtml(trackingLink("SEU_BOT", s))}</code></div>`
+              )
+              .join("")}
+            <div><span class="source-badge organic">Bio / direto</span><br/>
+              <code class="tracking-link">${escapeHtml(trackingLink("SEU_BOT", "organic"))}</code></div>
+          </div>
+        </div>
+        <script>
+          document.getElementById("btn-byanca-prompt")?.addEventListener("click", function(){
+            var el = document.getElementById("byanca-prompt-data");
+            var ta = document.querySelector('[name="prompt"]');
+            if (el && ta) ta.value = JSON.parse(el.textContent || '""');
+          });
+        </script>
         <label class="field span-2" id="midias">
           <span>Prévias (upload)</span>
           ${isEdit ? mediaChips(bot.previewMediaUrls, "Prévias atuais") : ""}

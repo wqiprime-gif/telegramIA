@@ -11,7 +11,8 @@ import {
 } from "./bots.js";
 import { env } from "./config.js";
 import { initDatabase, useDatabase } from "./db/index.js";
-import { logMessage, logReceipt, logSale, upsertLead } from "./db/events.js";
+import { logMessage, logReceipt, logSale, setLeadSource, upsertLead } from "./db/events.js";
+import { detectSourceFromText, parseStartPayload } from "./lib/lead-source.js";
 import { decryptSecret } from "./lib/crypto.js";
 import { createLaranjinhaCharge } from "./lib/laranjinha.js";
 import {
@@ -21,6 +22,7 @@ import {
   pickAudioFromAi
 } from "./lib/named-audio.js";
 import {
+  confirmsPriceInterest,
   isGreeting,
   limitSentences,
   wantsPixIntent,
@@ -28,11 +30,26 @@ import {
   wantsPriceTable
 } from "./lib/bot-intents.js";
 import {
+  createLeadState,
+  leadShowsBuyIntent,
+  leadStateContext,
+  looksLikeStalling,
+  nextColdMessage,
+  type LeadState
+} from "./lib/lead-state.js";
+import {
   naosouFakeMessage,
   parsePromptActions,
   priceTableMessage,
   PROMPT_ACTION_HINT
 } from "./lib/prompt-actions.js";
+import {
+  chamadaVideoMessage,
+  detectPackageFromHistory,
+  lowOfferBasicoHint,
+  negotiationReply,
+  parseOfferReais
+} from "./lib/sales-packages.js";
 import { randomPreviewIntro } from "./lib/humanize.js";
 import { formatReceiptOutcome, randomReceiptAck } from "./lib/receipt-messages.js";
 import {
@@ -60,9 +77,25 @@ type RuntimeBot = {
   previewSentAt: Map<number, number>;
   previewUsed: Set<number>;
   ignoredChats: Set<number>;
+  leadStateByChat: Map<number, LeadState>;
   /** evita mandar o mesmo input de audio toda hora (chatId:slug -> timestamp) */
   audioCooldown: Map<string, number>;
 };
+
+function getLeadState(runtime: RuntimeBot, chatId: number) {
+  let state = runtime.leadStateByChat.get(chatId);
+  if (!state) {
+    state = createLeadState();
+    runtime.leadStateByChat.set(chatId, state);
+  }
+  return state;
+}
+
+function silenceChat(runtime: RuntimeBot, chatId: number) {
+  runtime.ignoredChats.add(chatId);
+  const state = getLeadState(runtime, chatId);
+  state.paid = true;
+}
 
 const AUDIO_COOLDOWN_MS = 3 * 60 * 1000;
 
@@ -170,6 +203,9 @@ async function handleReceiptResult(input: {
   });
 
   if (input.result.paid) {
+    const runtime = runningBots.get(input.config.id);
+    if (runtime) silenceChat(runtime, input.chatId);
+
     await humanSendText(
       telegram,
       input.chatId,
@@ -286,6 +322,7 @@ async function startBot(config: BotConfig) {
     previewSentAt: new Map(),
     previewUsed: new Set(),
     ignoredChats: new Set(),
+    leadStateByChat: new Map(),
     audioCooldown: new Map()
   };
 
@@ -300,17 +337,31 @@ async function startBot(config: BotConfig) {
 
   bot.start(async (ctx) => {
     const from = ctx.from;
+    const startSource = parseStartPayload(ctx.startPayload);
     await upsertLead({
       botId: config.id,
       chatId: ctx.chat.id,
       username: from?.username,
-      displayName: [from?.first_name, from?.last_name].filter(Boolean).join(" ")
+      displayName: [from?.first_name, from?.last_name].filter(Boolean).join(" "),
+      source: startSource ?? undefined
     });
+    if (startSource) {
+      await logMessage({
+        botId: config.id,
+        chatId: ctx.chat.id,
+        role: "system",
+        content: `[origem] ${startSource} (link /start)`
+      });
+    }
   });
 
   bot.command("pix", async (ctx) => sendPaymentInstructions(bot, ctx.chat.id, config));
 
   bot.on("photo", async (ctx) => {
+    const chatId = ctx.chat.id;
+    const leadState = getLeadState(runtime, chatId);
+    if (runtime.ignoredChats.has(chatId) || leadState.paid) return;
+
     try {
       const photos = ctx.message.photo;
       const fileUrl = await ctx.telegram.getFileLink(photos[photos.length - 1].file_id);
@@ -335,6 +386,10 @@ async function startBot(config: BotConfig) {
   });
 
   bot.on("document", async (ctx) => {
+    const chatId = ctx.chat.id;
+    const leadState = getLeadState(runtime, chatId);
+    if (runtime.ignoredChats.has(chatId) || leadState.paid) return;
+
     try {
       const document = ctx.message.document;
       const fileName = document.file_name || "";
@@ -377,8 +432,9 @@ async function startBot(config: BotConfig) {
     const chatId = ctx.chat.id;
     const text = ctx.message.text;
     const from = ctx.from;
+    const leadState = getLeadState(runtime, chatId);
 
-    if (runtime.ignoredChats.has(chatId)) return;
+    if (runtime.ignoredChats.has(chatId) || leadState.paid) return;
 
     await upsertLead({
       botId: config.id,
@@ -390,8 +446,55 @@ async function startBot(config: BotConfig) {
 
     const history = runtime.historyByChat.get(chatId) || [];
     runtime.historyByChat.set(chatId, history);
+    leadState.userMessageCount += 1;
+    leadState.selectedPackage = detectPackageFromHistory([
+      ...history,
+      { role: "user", content: text }
+    ]);
+
+    if (leadState.userMessageCount === 1) {
+      const textSource = detectSourceFromText(text);
+      if (textSource) {
+        await setLeadSource({ botId: config.id, chatId, source: textSource });
+      }
+    }
 
     const library = config.audioLibrary ?? [];
+
+    if (/promete|depois eu pago|manda mais|só mais uma|so mais uma/i.test(text) && runtime.previewUsed.has(chatId)) {
+      await humanSendText(
+        ctx.telegram,
+        chatId,
+        config,
+        "todo mundo fala que paga depois bb 😅 previa voce ja teve, agora so comprando"
+      );
+      return;
+    }
+
+    const offer = parseOfferReais(text);
+    const negReply = negotiationReply({ text, selected: leadState.selectedPackage });
+    if (negReply && offer !== null) {
+      await humanSendText(ctx.telegram, chatId, config, negReply);
+      const hint = lowOfferBasicoHint(offer);
+      if (hint && !/(basico|chamada|completo|pack)/i.test(text)) {
+        await humanSendText(ctx.telegram, chatId, config, hint);
+      }
+      history.push({ role: "user", content: text }, { role: "assistant", content: negReply });
+      return;
+    }
+
+    if (looksLikeStalling(text, history) && !leadShowsBuyIntent(text)) {
+      const cold = nextColdMessage(leadState);
+      if (cold) {
+        leadState.coldStrike += 1;
+        await humanSendText(ctx.telegram, chatId, config, cold);
+        history.push({ role: "user", content: text }, { role: "assistant", content: cold });
+        if (leadState.userMessageCount >= 6 && leadState.coldStrike >= 3) {
+          runtime.ignoredChats.add(chatId);
+        }
+        return;
+      }
+    }
 
     const leadAudio = findContextualLeadAudio(text, library);
     if (leadAudio && canSendAudio(chatId, leadAudio)) {
@@ -407,7 +510,8 @@ async function startBot(config: BotConfig) {
     }
 
     if (wantsPreviewIntent(text) && config.previewMediaUrls.length > 0) {
-      await sendPreview(runtime, chatId);
+      const sent = await sendPreview(runtime, chatId);
+      if (sent) leadState.hasSentAmostra = true;
       return;
     }
 
@@ -415,6 +519,8 @@ async function startBot(config: BotConfig) {
       await sendPaymentInstructions(bot, chatId, config);
       return;
     }
+
+    const isFirstTurn = history.filter((m) => m.role === "user").length === 0;
 
     try {
       const openai = await getOpenAI(config.userId);
@@ -428,6 +534,7 @@ async function startBot(config: BotConfig) {
             content: `${config.prompt}
 
 Pix: ${config.pixKey}. Produto padrao: ${config.productName}.
+${leadStateContext(leadState)}
 ${PROMPT_ACTION_HINT}
 Audios: ${audioLibraryPrompt(library)}.`
           },
@@ -436,7 +543,18 @@ Audios: ${audioLibraryPrompt(library)}.`
         ]
       });
       const rawReply = completion.choices[0]?.message.content?.trim() || "oii amor, me chama de novo 😘";
-      const { clean, actions, audioSlugs } = parsePromptActions(rawReply);
+      let { clean, actions, audioSlugs } = parsePromptActions(rawReply);
+
+      if (isFirstTurn) {
+        actions = actions.filter((a) => a !== "send_informacoes");
+      }
+      if (leadState.hasSentInformacoes) {
+        actions = actions.filter((a) => a !== "send_informacoes");
+      }
+      if (leadState.hasSentAmostra || runtime.previewUsed.has(chatId)) {
+        actions = actions.filter((a) => a !== "send_amostra_gratis");
+      }
+
       const chosenAudio = pickAudioFromAi(library, {
         audioSlugs,
         actions,
@@ -445,8 +563,12 @@ Audios: ${audioLibraryPrompt(library)}.`
       });
       let outText = limitSentences(clean);
 
-      if (isGreeting(text) && history.length === 0 && !outText) {
-        outText = "oii amor, tudo bem? 😊";
+      if (isGreeting(text) && isFirstTurn) {
+        outText = outText || "oii amor, tudo bem? 😊";
+      }
+
+      if (leadState.hasSentInformacoes && rawReply.includes("send_informacoes")) {
+        outText = outText || "ja te mandei os pacotes amor, qual voce quer? 😊";
       }
 
       history.push({ role: "user", content: text }, { role: "assistant", content: rawReply });
@@ -456,35 +578,37 @@ Audios: ${audioLibraryPrompt(library)}.`
         runtime.ignoredChats.add(chatId);
       }
 
-      if (actions.includes("send_informacoes")) {
+      const wantsTable =
+        actions.includes("send_informacoes") ||
+        (wantsPriceTable(text) && (confirmsPriceInterest(text) || leadState.userMessageCount > 2));
+
+      if (wantsTable && !leadState.hasSentInformacoes && !isFirstTurn) {
+        leadState.hasSentInformacoes = true;
         await humanSendText(ctx.telegram, chatId, config, priceTableMessage());
+      } else if (actions.includes("chamada_video")) {
+        await humanSendText(ctx.telegram, chatId, config, chamadaVideoMessage());
       } else if (chosenAudio && canSendAudio(chatId, chosenAudio)) {
         await humanSendNamedAudio(ctx.telegram, chatId, config, chosenAudio.url);
+        if (actions.includes("naosou_fake")) leadState.hasSentNaoSouFake = true;
       } else if (actions.includes("naosou_fake")) {
+        leadState.hasSentNaoSouFake = true;
         await humanSendText(ctx.telegram, chatId, config, naosouFakeMessage());
       } else if (outText) {
         await humanSendText(ctx.telegram, chatId, config, outText);
       }
 
       if (actions.includes("send_amostra_gratis") && config.previewMediaUrls.length > 0) {
-        await sendPreview(runtime, chatId);
-      }
-
-      if (
-        wantsPriceTable(text) &&
-        !actions.includes("send_informacoes") &&
-        /tabela|precos|preços|valores|quanto/i.test(text) &&
-        !/9[,.]90|15[,.]00|20[,.]00/.test(outText)
-      ) {
-        await humanSendText(ctx.telegram, chatId, config, priceTableMessage());
+        const sent = await sendPreview(runtime, chatId);
+        if (sent) leadState.hasSentAmostra = true;
       }
 
       const lower = clean.toLowerCase();
       const aiOffersPreview =
         /previa|prévia|vou te mandar|segue a foto|mando agora|olha s[oó]/i.test(lower) &&
         config.previewMediaUrls.length > 0;
-      if (aiOffersPreview && !actions.includes("send_amostra_gratis")) {
-        await sendPreview(runtime, chatId, { skipIntro: true });
+      if (aiOffersPreview && !actions.includes("send_amostra_gratis") && !runtime.previewUsed.has(chatId)) {
+        const sent = await sendPreview(runtime, chatId, { skipIntro: true });
+        if (sent) leadState.hasSentAmostra = true;
       }
     } catch (error) {
       console.error(error);

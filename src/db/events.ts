@@ -20,6 +20,7 @@ export type Lead = {
   chatId: number;
   username?: string;
   displayName?: string;
+  source: string;
   createdAt: string;
   lastMessageAt: string;
 };
@@ -97,10 +98,13 @@ export async function initEventsSchema() {
       chat_id BIGINT NOT NULL,
       username TEXT,
       display_name TEXT,
+      source TEXT NOT NULL DEFAULT 'unknown',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       last_message_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE(bot_id, chat_id)
     );
+
+    ALTER TABLE leads ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'unknown';
 
     CREATE TABLE IF NOT EXISTS conversation_messages (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -156,16 +160,23 @@ export async function upsertLead(input: {
   chatId: number;
   username?: string;
   displayName?: string;
+  source?: string;
 }) {
+  const source = input.source?.trim() || undefined;
+
   if (useDatabase()) {
     await getPool().query(
-      `INSERT INTO leads (bot_id, chat_id, username, display_name)
-       VALUES ($1,$2,$3,$4)
+      `INSERT INTO leads (bot_id, chat_id, username, display_name, source)
+       VALUES ($1,$2,$3,$4,COALESCE($5, 'unknown'))
        ON CONFLICT (bot_id, chat_id) DO UPDATE SET
          username = COALESCE(EXCLUDED.username, leads.username),
          display_name = COALESCE(EXCLUDED.display_name, leads.display_name),
+         source = CASE
+           WHEN leads.source IS NULL OR leads.source = 'unknown' THEN COALESCE(EXCLUDED.source, leads.source)
+           ELSE leads.source
+         END,
          last_message_at = NOW()`,
-      [input.botId, input.chatId, input.username ?? null, input.displayName ?? null]
+      [input.botId, input.chatId, input.username ?? null, input.displayName ?? null, source ?? null]
     );
     return;
   }
@@ -177,6 +188,7 @@ export async function upsertLead(input: {
     existing.lastMessageAt = now;
     if (input.username) existing.username = input.username;
     if (input.displayName) existing.displayName = input.displayName;
+    if (source && (!existing.source || existing.source === "unknown")) existing.source = source;
   } else {
     store.leads.push({
       id: randomUUID(),
@@ -184,11 +196,63 @@ export async function upsertLead(input: {
       chatId: input.chatId,
       username: input.username,
       displayName: input.displayName,
+      source: source ?? "unknown",
       createdAt: now,
       lastMessageAt: now
     });
   }
   await saveFileStore(store);
+}
+
+export async function setLeadSource(input: { botId: string; chatId: number; source: string }) {
+  if (useDatabase()) {
+    await getPool().query(
+      `UPDATE leads SET source = $3
+       WHERE bot_id = $1 AND chat_id = $2
+         AND (source IS NULL OR source = 'unknown')`,
+      [input.botId, input.chatId, input.source]
+    );
+    return;
+  }
+  const store = await loadFileStore();
+  const lead = store.leads.find((l) => l.botId === input.botId && l.chatId === input.chatId);
+  if (lead && (!lead.source || lead.source === "unknown")) lead.source = input.source;
+  await saveFileStore(store);
+}
+
+export type LeadSourceStat = { source: string; count: number };
+
+export async function leadSourcesStats(userId?: string, limit = 12): Promise<LeadSourceStat[]> {
+  const botIds = await botIdsForUser(userId);
+  if (userId && botIds && botIds.length === 0) return [];
+
+  if (useDatabase()) {
+    const { rows } = botIds
+      ? await getPool().query<{ source: string; count: string }>(
+          `SELECT COALESCE(NULLIF(source, ''), 'unknown') AS source, COUNT(*)::text AS count
+           FROM leads WHERE bot_id = ANY($1::uuid[])
+           GROUP BY 1 ORDER BY count DESC LIMIT $2`,
+          [botIds, limit]
+        )
+      : await getPool().query<{ source: string; count: string }>(
+          `SELECT COALESCE(NULLIF(source, ''), 'unknown') AS source, COUNT(*)::text AS count
+           FROM leads GROUP BY 1 ORDER BY count DESC LIMIT $1`,
+          [limit]
+        );
+    return rows.map((r) => ({ source: r.source, count: Number(r.count) }));
+  }
+
+  const store = await loadFileStore();
+  const map = new Map<string, number>();
+  for (const l of store.leads) {
+    if (botIds && !botIds.includes(l.botId)) continue;
+    const s = l.source || "unknown";
+    map.set(s, (map.get(s) ?? 0) + 1);
+  }
+  return [...map.entries()]
+    .map(([source, count]) => ({ source, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
 }
 
 export async function logMessage(input: {

@@ -46,11 +46,11 @@ Resumo das regras que o **código deve garantir** (não só confiar na IA):
 | `send_amostra_gratis` 1x | `previewUsed` ✅ |
 | Recusa 2ª prévia | Mensagens fixas ✅ |
 | `naosou_fake` | `[[naosou_fake]]` + `[[audio:nao_sou_fake]]` ✅ |
-| `ignorar_lead` após enrolação 6+ msgs | Contador mensagens + escalada frieza ❌ **FALTA** |
-| 3 pacotes + negociação mínima | `priceTableMessage` fixo ⚠️ **FALTA config por instância** |
-| Chamada vídeo (Telegram) | Tag `[[chamada_video]]` ❌ **FALTA** |
+| `ignorar_lead` após enrolação 6+ msgs | Contador + escalada frieza ✅ (v0.5.0) |
+| 3 pacotes + negociação mínima | `negotiationReply` R$5/10/15 ✅ — config painel ⚠️ |
+| Chamada vídeo (Telegram) | `[[chamada_video]]` ✅ (v0.5.0) |
 | Pix + comprovante | ✅ validar + entregar |
-| Após pagamento = silêncio | `ignoredChats` após paid ❌ **REFORÇAR** |
+| Após pagamento = silêncio | `silenceChat` após paid ✅ (v0.5.0) |
 | Áudio confuso do lead | Whisper + pedir texto ❌ **FALTA** |
 
 ---
@@ -59,14 +59,13 @@ Resumo das regras que o **código deve garantir** (não só confiar na IA):
 
 ### 3.1 Fluxo / IA (prioridade ALTA)
 
-- [ ] **`leadState` por chat** (em memória + opcional persistir DB):  
-  `messageCount`, `coldStrikeCount`, `hasSentInformacoes`, `hasSentAmostra`, `hasSentNaoSouFake`, `selectedPackage`, `paid`
-- [ ] **Escalada "lead enrolando"** (1ª, 2ª, 3ª msg fria automática antes da IA — conforme prompt)
-- [ ] **`[[chamada_video]]`** — resposta padrão Telegram (5 min, após pagamento, aqui no app)
+- [x] **`leadState` por chat** — `src/lib/lead-state.ts` (v0.5.0)
+- [x] **Escalada "lead enrolando"** — 3 mensagens frias + ignore em 6+ msgs (v0.5.0)
+- [x] **`[[chamada_video]]`** — `src/lib/sales-packages.ts` (v0.5.0)
 - [ ] **Whisper** — transcrever voz/nota do lead → passar como texto no fluxo
 - [ ] **`detectarPacote()`** — regex + contexto (portar de `bot-instance.js` hotbot)
-- [ ] **Negociação com mínimos** — Básico R$5 / Chamada R$10 / Completo R$15 (validar no código, não só prompt)
-- [ ] **`paidChats` permanente** após comprovante aprovado (nunca mais responder)
+- [x] **Negociação com mínimos** — `negotiationReply` (v0.5.0)
+- [x] **`paidChats` permanente** — `silenceChat` após comprovante (v0.5.0)
 - [ ] **Fila global entre leads** (45s–2min) — opcional, como hotbot
 - [ ] **Debounce por lead** (buffer 30–60s antes de chamar OpenAI)
 - [ ] **OpenAI tools** (function calling) em vez de só tags no texto — alinhar hotbot
@@ -91,8 +90,8 @@ Resumo das regras que o **código deve garantir** (não só confiar na IA):
 
 ### 4.1 Bot
 
-- [ ] Garantir **`send_informacoes` não dispara** na primeira mensagem do lead
-- [ ] **`hasSentInformacoes`** — não enviar tabela 2x
+- [x] **`send_informacoes` não dispara** no 1º turno (v0.5.0)
+- [x] **`hasSentInformacoes`** — não enviar tabela 2x (v0.5.0)
 - [ ] Comprovante validar **nome destinatário** (`pixRecipientName`) + **valor do pacote detectado**
 - [ ] Entrega: link correto por pacote (não só `telegramGroupLink` genérico)
 - [ ] Sincronizar texto prompt (SP/RJ) com áudios de localização (não SC se prompt diz SP)

@@ -4,9 +4,11 @@ export type PromptAction =
   | "send_informacoes"
   | "send_amostra_gratis"
   | "naosou_fake"
-  | "ignorar_lead";
+  | "ignorar_lead"
+  | "chamada_video";
 
-const ACTION_RE = /\[\[(send_informacoes|send_amostra_gratis|naosou_fake|ignorar_lead)\]\]/gi;
+const ACTION_RE =
+  /\[\[(send_informacoes|send_amostra_gratis|naosou_fake|ignorar_lead|chamada_video)\]\]/gi;
 
 export function parsePromptActions(text: string) {
   const actions: PromptAction[] = [];
@@ -41,6 +43,7 @@ ACOES (tag na ultima linha quando precisar):
 [[send_amostra_gratis]] = previa gratis (UMA vez por lead)
 [[naosou_fake]] = mesmo que [[audio:nao_sou_fake]] se existir no cadastro
 [[ignorar_lead]] = parar de responder lead enrolado
+[[chamada_video]] = explicar chamada 5 min aqui no Telegram apos pagamento
 
 INPUTS DE AUDIO (como Pix — use SOMENTE no momento certo, nao toda hora):
 - No seu prompt: "se lead desconfiar use [[audio:nao_sou_fake]]"

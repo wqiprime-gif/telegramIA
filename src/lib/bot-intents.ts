@@ -20,6 +20,11 @@ export function wantsPixIntent(text: string) {
   return /pix|pagar|pagamento|comprovante|vou comprar|quero comprar|manda (o )?pix/i.test(text);
 }
 
+export function confirmsPriceInterest(text: string) {
+  return /^(sim|s|pode|manda|quero|bora|manda ai|manda aí|show|ok|quero ver|quero sim)/i.test(text.trim()) ||
+    /(quero ver|manda a tabela|mostra|pode mandar).*(tabela|precos|preços|pacotes)/i.test(text);
+}
+
 export function limitSentences(text: string, max = 2) {
   const trimmed = text.replace(/\[\[[\w_]+\]\]/gi, "").trim();
   if (!trimmed) return "";

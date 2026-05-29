@@ -1,4 +1,5 @@
 import type { BotConfig } from "../bots.js";
+import { sourceEmoji, sourceLabel } from "../lib/lead-source.js";
 import { alertHtml, appLayout, escapeHtml, type NavId } from "./layout.js";
 import { icons } from "./icons.js";
 
@@ -20,15 +21,19 @@ export function leadsPage(rows: Record<string, unknown>[], partial?: boolean) {
   const list =
     rows.length === 0
       ? `<div class="empty">Nenhum lead ainda. Quando alguem falar com o bot, aparece aqui.</div>`
-      : `<table class="table"><thead><tr><th>Lead</th><th>Bot</th><th>Chat ID</th><th>Ultima msg</th></tr></thead><tbody>
+      : `<table class="table"><thead><tr><th>Lead</th><th>Origem</th><th>Bot</th><th>Chat ID</th><th>Ultima msg</th></tr></thead><tbody>
       ${rows
         .map(
-          (r) => `<tr>
+          (r) => {
+            const src = String(r.source || "unknown");
+            return `<tr>
           <td><strong>${escapeHtml(String(r.display_name || r.username || "Lead"))}</strong><br/><span style="color:var(--muted);font-size:0.8rem">@${escapeHtml(String(r.username || "—"))}</span></td>
+          <td><span class="source-badge ${escapeHtml(src)}">${sourceEmoji(src)} ${escapeHtml(sourceLabel(src))}</span></td>
           <td>${escapeHtml(String(r.bot_name || "—"))}</td>
           <td><code>${r.chat_id}</code></td>
           <td>${formatDate(String(r.last_message_at || r.lastMessageAt))}</td>
-        </tr>`
+        </tr>`;
+          }
         )
         .join("")}
       </tbody></table>`;

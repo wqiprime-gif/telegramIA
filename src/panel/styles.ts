@@ -1,7 +1,7 @@
 import { designSystem as ds } from "./design-system.js";
 
 export const globalStyles = `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap');
 
 :root {
   --bg: ${ds.colors.bgBase};
@@ -737,6 +737,57 @@ button, input, textarea, select { font-family: inherit; }
   border-top: 1px solid var(--border);
 }
 
+/* Login 3D */
+.panel-scene-wrap {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+}
+#panel-scene-canvas {
+  width: 100%; height: 100%; display: block;
+  opacity: 0.55;
+  mask-image: radial-gradient(ellipse 70% 60% at 30% 40%, black 20%, transparent 72%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-box { transform: none !important; }
+  #panel-scene-canvas { display: none; }
+}
+
+/* Origem dos leads */
+.source-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--border-hi);
+  background: rgba(255, 255, 255, 0.04);
+}
+.source-badge.tiktok { border-color: rgba(0, 242, 234, 0.45); color: #5eead4; }
+.source-badge.instagram { border-color: rgba(236, 72, 153, 0.45); color: #f9a8d4; }
+.source-badge.twitter { border-color: rgba(56, 189, 248, 0.45); color: #7dd3fc; }
+.source-badge.youtube { border-color: rgba(248, 113, 113, 0.45); color: #fca5a5; }
+.source-stat-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+.source-stat {
+  padding: 14px 12px; border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card);
+  text-align: center;
+  transition: transform 0.25s var(--ease), border-color 0.25s;
+}
+.source-stat:hover {
+  transform: translateY(-3px) scale(1.02);
+  border-color: var(--border-hi);
+}
+.source-stat strong { display: block; font-size: 1.35rem; font-family: var(--font-display); }
+.source-stat span { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.tracking-links { display: grid; gap: 8px; margin-top: 12px; }
+.tracking-link {
+  font-family: var(--font-mono); font-size: 0.75rem;
+  padding: 10px 12px; border-radius: 10px;
+  background: rgba(0,0,0,0.45); border: 1px solid var(--border);
+  word-break: break-all; color: var(--accent-sky);
+}
+
 /* Login */
 .login-page {
   min-height: 100vh; display: grid; grid-template-columns: 1.15fr 1fr;
@@ -790,6 +841,12 @@ button, input, textarea, select { font-family: inherit; }
   border-radius: var(--radius-lg);
   box-shadow: 0 0 60px rgba(255, 45, 85, 0.12), var(--glass-shadow);
   backdrop-filter: blur(var(--glass-blur));
+  transform: perspective(900px) rotateY(-4deg) rotateX(2deg);
+  transition: transform 0.45s var(--ease), box-shadow 0.45s var(--ease);
+}
+.login-box:hover {
+  transform: perspective(900px) rotateY(-1deg) rotateX(0deg) translateY(-4px);
+  box-shadow: 0 0 80px rgba(255, 45, 85, 0.2), 0 32px 80px rgba(0, 0, 0, 0.55), var(--glass-shadow);
 }
 .login-box h2 {
   font-family: var(--font-display);

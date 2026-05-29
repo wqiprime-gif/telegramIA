@@ -6,6 +6,9 @@ import { alertHtml, appLayout, escapeHtml } from "./layout.js";
 import { brandMarkHtml } from "./brand.js";
 import { salesChartSvgFromData } from "./pages.js";
 import { globalStyles } from "./styles.js";
+import { panelSceneScript } from "./panel-scene.js";
+import type { LeadSourceStat } from "../db/events.js";
+import { sourceEmoji, sourceLabel } from "../lib/lead-source.js";
 
 export type DashboardData = {
   stats: {
@@ -17,7 +20,24 @@ export type DashboardData = {
   chart: { day: string; totalCents: number }[];
   activities: ActivityItem[];
   topBots: BotSalesRank[];
+  leadSources: LeadSourceStat[];
 };
+
+export function leadSourcesGridHtml(stats: LeadSourceStat[]) {
+  if (stats.length === 0) {
+    return `<p class="form-hint" style="padding:8px 0">Nenhum lead com origem ainda. Use links <code>?start=tiktok</code> na bio.</p>`;
+  }
+  return `<div class="source-stat-grid">
+    ${stats
+      .map(
+        (s) => `<div class="source-stat">
+        <strong>${s.count}</strong>
+        <span>${sourceEmoji(s.source)} ${escapeHtml(sourceLabel(s.source))}</span>
+      </div>`
+      )
+      .join("")}
+  </div>`;
+}
 
 export function formatRelativeTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -108,6 +128,7 @@ export function loginPage(message = "") {
   <style>${globalStyles}</style>
 </head>
 <body>
+  <div class="panel-scene-wrap" aria-hidden="true"><canvas id="panel-scene-canvas"></canvas></div>
   <div class="ambient" aria-hidden="true"></div>
   <div class="login-page">
     <div class="login-hero">
@@ -142,6 +163,7 @@ export function loginPage(message = "") {
       </div>
     </div>
   </div>
+  <script>${panelSceneScript()}</script>
 </body>
 </html>`;
 }
@@ -214,7 +236,12 @@ export function dashboardPage(
       </div>
     </div>
 
-    <div class="grid-3">
+    <div class="grid-2" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+      <div class="card">
+        <div class="card-head"><h3>Origem dos leads</h3></div>
+        <div class="card-body" data-live="lead-sources">${leadSourcesGridHtml(data.leadSources)}</div>
+        <div class="card-foot"><a href="/leads" class="card-link">Ver todos os leads →</a></div>
+      </div>
       <div class="card">
         <div class="card-head"><h3>Configuração Rápida</h3></div>
         <div class="card-body">
@@ -309,6 +336,8 @@ export function registerPage(message = "") {
   <style>${globalStyles}</style>
 </head>
 <body>
+  <div class="panel-scene-wrap" aria-hidden="true"><canvas id="panel-scene-canvas"></canvas></div>
+  <div class="ambient" aria-hidden="true"></div>
   <div class="login-page">
     <div class="login-hero">
       <div class="sidebar-brand" style="padding:0 0 24px"><div class="logo">BM</div> BotManager</div>
@@ -331,6 +360,7 @@ export function registerPage(message = "") {
       </div>
     </div>
   </div>
+  <script>${panelSceneScript()}</script>
 </body>
 </html>`;
 }

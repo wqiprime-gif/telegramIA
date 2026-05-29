@@ -37,8 +37,8 @@ export const designSystem = {
       "0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 0 0 1px rgba(255, 45, 85, 0.08), 0 24px 64px rgba(0, 0, 0, 0.65)"
   },
   fonts: {
-    display: "'Outfit', system-ui, sans-serif",
-    sans: "'Inter', system-ui, sans-serif",
+    display: "'Syne', system-ui, sans-serif",
+    sans: "'DM Sans', system-ui, sans-serif",
     mono: "'JetBrains Mono', ui-monospace, monospace"
   },
   motion: "280ms cubic-bezier(0.22, 1, 0.36, 1)"
