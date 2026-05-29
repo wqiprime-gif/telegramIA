@@ -63,15 +63,66 @@ function mediaChips(urls: string[], label: string) {
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px">Novos arquivos serão adicionados aos existentes.</p>`;
 }
 
+/** Bloco de configuração de prévia gratuita (instância ou Configurações). */
+export function previewConfigBlock(bot: BotConfig | undefined, formId = "bot-preview-form") {
+  const urls = bot?.previewMediaUrls ?? [];
+  const previewAudios = countAudioUrls(urls);
+  const list =
+    urls.length === 0
+      ? `<p class="form-hint">Nenhuma prévia cadastrada. Envie fotos, vídeos ou áudios abaixo.</p>`
+      : `<ul class="preview-url-list">
+      ${urls
+        .map((url, i) => {
+          const name = url.split("/").pop() || url;
+          const isAudio = /\.(mp3|m4a|ogg|opus|wav)(\?.*)?$/i.test(url);
+          return `<li class="preview-url-item">
+            <a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="preview-url-link">${escapeHtml(name)}</a>
+            <span class="badge badge-online">${isAudio ? "Áudio" : "Mídia"}</span>
+            <label class="audio-remove"><input type="checkbox" form="${formId}" name="removePreviewIndexes" value="${i}" /> Remover</label>
+          </li>`;
+        })
+        .join("")}
+    </ul>`;
+
+  return `
+    <div class="form-section form-section-preview" id="previa">
+      <div class="form-section-head">
+        <span class="form-section-icon form-section-icon-cyan">${icons.image}</span>
+        <div>
+          <h4>Prévia gratuita (amostra)</h4>
+          <p>Fotos, vídeos ou áudios enviados <strong>uma vez por lead</strong> quando pedir amostra ou a IA usar <code>[[send_amostra_gratis]]</code>.</p>
+        </div>
+      </div>
+      ${list}
+      ${urls.length > 0 ? `<p class="form-hint">${urls.length} arquivo(s) · ${previewAudios} áudio(s)</p>` : ""}
+      <div class="preview-upload-grid">
+        <label class="field">
+          <span>Mídias de prévia</span>
+          <div class="dropzone">
+            <p style="color:var(--muted);margin-bottom:8px">${icons.upload} Imagens, vídeos ou notas de voz (.ogg)</p>
+            <input form="${formId}" name="previewFiles" type="file" accept="image/*,video/*,audio/*,.ogg,.opus" multiple />
+          </div>
+        </label>
+        <label class="field">
+          <span>Só áudio de prévia</span>
+          <div class="dropzone dropzone-audio">
+            <p style="color:var(--muted);margin-bottom:8px">${icons.audio} MP3, M4A ou OGG</p>
+            <input form="${formId}" name="previewAudioFiles" type="file" accept="audio/*,.ogg,.opus,audio/ogg" multiple />
+          </div>
+        </label>
+      </div>
+      <p class="form-hint">Marque &quot;Remover&quot; nos arquivos antigos e envie novos para substituir. Salve o formulário para aplicar.</p>
+    </div>`;
+}
+
 export function botInstanceForm(mode: "new" | "edit", bot?: BotConfig) {
   const isEdit = mode === "edit" && bot;
   const action = isEdit ? `/instances/${bot.id}` : "/bots";
   const activeTrue = !isEdit || bot.active;
   const paymentPix = !isEdit || bot.paymentMethod !== "laranjinha";
   const delay = delayPartsFromMs(isEdit ? bot.messageDelayMs : 4000);
-  const previewAudios = isEdit ? countAudioUrls(bot.previewMediaUrls) : 0;
   return `
-    <form method="post" action="${action}" enctype="multipart/form-data">
+    <form id="bot-preview-form" method="post" action="${action}" enctype="multipart/form-data">
       <div class="form-grid">
         <label class="field">Nome da instância
           <input name="name" value="${isEdit ? escapeHtml(bot.name) : ""}" placeholder="Ex: MorenaVIP" required />
@@ -155,8 +206,9 @@ export function botInstanceForm(mode: "new" | "edit", bot?: BotConfig) {
               <input name="newAudioFile" type="file" accept="audio/*,.ogg,.opus,audio/ogg" />
             </div>
           </label>
-          ${isEdit ? `<p class="form-hint">Prévia: ${previewAudios} áudio(s) cadastrado(s)</p>` : ""}
         </div>
+
+        ${previewConfigBlock(isEdit ? bot : undefined, "bot-preview-form")}
 
         <label class="field span-2" id="prompt">Prompt / persona da IA
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
@@ -187,14 +239,6 @@ export function botInstanceForm(mode: "new" | "edit", bot?: BotConfig) {
             if (el && ta) ta.value = JSON.parse(el.textContent || '""');
           });
         </script>
-        <label class="field span-2" id="midias">
-          <span>Prévias (upload)</span>
-          ${isEdit ? mediaChips(bot.previewMediaUrls, "Prévias atuais") : ""}
-          <div class="dropzone">
-            <p style="color:var(--muted);margin-bottom:8px">${icons.upload} ${isEdit ? "Adicionar mais prévias" : "Imagens, vídeos, áudios ou notas de voz (.ogg)"}</p>
-            <input name="previewFiles" type="file" accept="image/*,video/*,audio/*,.ogg,.opus" multiple />
-          </div>
-        </label>
         <label class="field">Forma de pagamento
           <select name="paymentMethod">
             <option value="pix" ${paymentPix ? "selected" : ""}>Pix manual (chave)</option>

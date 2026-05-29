@@ -104,7 +104,7 @@ async function parseBotMultipart(request: FastifyRequest) {
       continue;
     }
     const key = part.fieldname;
-    if (key === "removeAudioIndexes") {
+    if (key === "removeAudioIndexes" || key === "removePreviewIndexes") {
       const prev = fields[key] ? `${fields[key]},` : "";
       fields[key] = `${prev}${String(part.value || "")}`;
     } else {
@@ -144,6 +144,22 @@ function mergeAudioLibrary(
   }
 
   return library;
+}
+
+function mergePreviewUrls(
+  existing: string[],
+  fields: Record<string, string>,
+  uploads: string[]
+) {
+  const removeRaw = fields.removePreviewIndexes || "";
+  const removeSet = new Set(
+    removeRaw
+      .split(",")
+      .map((v) => Number(v.trim()))
+      .filter((n) => Number.isFinite(n))
+  );
+  const kept = existing.filter((_, index) => !removeSet.has(index));
+  return [...kept, ...uploads];
 }
 
 const botFormFieldsSchema = z.object({
@@ -719,7 +735,7 @@ export async function registerPanelRoutes(
         pixKey: body.pixKey || existing.pixKey,
         pixRecipientName: body.pixRecipientName?.trim() || body.name,
         messageDelayMs: messageDelayMsFromForm(body),
-        previewMediaUrls: [...existing.previewMediaUrls, ...previewUploads],
+        previewMediaUrls: mergePreviewUrls(existing.previewMediaUrls, fields, previewUploads),
         deliveryMediaUrls: existing.deliveryMediaUrls,
         audioLibrary: mergeAudioLibrary(existing.audioLibrary ?? [], fields, newNamedAudioUrl),
         avatarUrl: avatarUrl || existing.avatarUrl,
@@ -745,7 +761,11 @@ export async function registerPanelRoutes(
   app.get("/settings", async (request, reply) => {
     const user = requireUser(request, reply);
     if (!user) return;
-    const query = z.object({ msg: z.string().optional(), t: z.string().optional() }).parse(request.query);
+    const query = z
+      .object({ msg: z.string().optional(), t: z.string().optional(), botId: z.string().optional() })
+      .parse(request.query);
+    const bots = await loadBots(user.id);
+    const previewBotId = query.botId || bots[0]?.id || "";
     const status = await getApiKeyStatus(user.id);
     const model = await getOpenAIModel(user.id);
     const provider = await getAIProvider(user.id);
@@ -761,10 +781,38 @@ export async function registerPanelRoutes(
           provider,
           providerLabel: status.providerLabel
         },
+        bots,
+        previewBotId,
         isPartial(request),
         panelUserLabel(user)
       )
     );
+  });
+
+  app.post("/settings/previews", async (request, reply) => {
+    const user = requireUser(request, reply);
+    if (!user) return;
+    let botId = "";
+    try {
+      const { fields, previewUploads } = await parseBotMultipart(request);
+      botId = fields.botId?.trim() || "";
+      if (!botId) throw new Error("Selecione uma instância.");
+      const bot = await getBotById(botId, user.id);
+      if (!bot) throw new Error("Instância não encontrada.");
+      await upsertBot({
+        ...bot,
+        previewMediaUrls: mergePreviewUrls(bot.previewMediaUrls ?? [], fields, previewUploads)
+      });
+      hooks.restartBots();
+      return reply.redirect(
+        flashRedirect(`/settings?botId=${botId}`, "Prévias da instância atualizadas!")
+      );
+    } catch (error) {
+      request.log.error(error);
+      return reply.redirect(
+        flashRedirect(`/settings?botId=${botId}`, `Erro: ${errorMessage(error)}`, "err")
+      );
+    }
   });
 
   app.post("/settings", async (request, reply) => {
@@ -820,7 +868,7 @@ export async function registerPanelRoutes(
         pixKey: body.pixKey || "nao-configurado",
         pixRecipientName: body.pixRecipientName?.trim() || body.name,
         messageDelayMs: messageDelayMsFromForm(body),
-        previewMediaUrls: previewUploads,
+        previewMediaUrls: mergePreviewUrls([], fields, previewUploads),
         deliveryMediaUrls: [],
         audioLibrary: mergeAudioLibrary([], fields, newNamedAudioUrl),
         avatarUrl,

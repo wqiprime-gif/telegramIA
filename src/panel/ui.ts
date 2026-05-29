@@ -1,6 +1,6 @@
 import type { BotConfig } from "../bots.js";
 import type { ActivityItem, BotSalesRank } from "../db/events.js";
-import { botInstanceForm, instancesTableHtml } from "./bot-form.js";
+import { botInstanceForm, instancesTableHtml, previewConfigBlock } from "./bot-form.js";
 import { icons } from "./icons.js";
 import { alertHtml, appLayout, escapeHtml } from "./layout.js";
 import { brandMarkHtml } from "./brand.js";
@@ -160,17 +160,19 @@ export function loginPage(message = "") {
         <h2>Entrar</h2>
         <p class="sub">Acesse seu painel BotManager</p>
         ${message ? alertHtml(message, "error") : ""}
-        <form method="post" action="/login">
-          <label class="field">E-mail
+        <form method="post" action="/login" class="auth-form">
+          <label class="field">
+            <span class="field-label">E-mail</span>
             <input name="email" type="email" placeholder="voce@email.com" required autofocus />
           </label>
-          <label class="field">Senha
-            <input name="password" type="password" placeholder="••••••••" required />
+          <label class="field">
+            <span class="field-label">Senha</span>
+            <input name="password" type="password" placeholder="Sua senha" required />
           </label>
           <button type="submit" class="btn btn-primary btn-block btn-glow">Entrar no painel</button>
         </form>
-        <p style="margin-top:20px;text-align:center;font-size:0.85rem;color:var(--muted)">
-          Nao tem conta? <a href="/register" style="color:#0a5cff;font-weight:600">Criar conta</a>
+        <p class="auth-footer">
+          Não tem conta? <a href="/register">Criar conta</a>
         </p>
       </div>
     </section>
@@ -382,7 +384,7 @@ export function registerPage(message = "") {
     <section class="login-showcase">
       ${brandMarkHtml("Painel Telegram")}
       <p class="login-eyebrow">Comece em minutos</p>
-      <h1>Conta <span>BotManager</span></h1>
+      <h1 class="login-title-3d"><span class="text-3d-line">Criar conta</span><span class="text-3d-line accent">BotManager</span></h1>
       <p class="login-prose">
         Crie sua conta para configurar instâncias, conectar o Telegram e acompanhar
         vendas, leads e conversas com o mesmo nível de controle do painel operacional.
@@ -394,17 +396,28 @@ export function registerPage(message = "") {
         <h2>Criar conta</h2>
         <p class="sub">Comece em menos de 1 minuto</p>
         ${message ? alertHtml(message, "error") : ""}
-        <form method="post" action="/register">
-          <label class="field">Seu nome<input name="name" required /></label>
-          <label class="field">E-mail<input name="email" type="email" required /></label>
-          <label class="field">Senha<input name="password" type="password" minlength="6" required /></label>
-          <label class="field">Código de convite<input name="inviteCode" required placeholder="Código fornecido pelo admin" autocomplete="off" />
-            <small style="color:var(--muted)">Conta só com convite válido.</small>
+        <form method="post" action="/register" class="auth-form">
+          <label class="field">
+            <span class="field-label">Seu nome</span>
+            <input name="name" placeholder="Como quer ser chamado" required />
+          </label>
+          <label class="field">
+            <span class="field-label">E-mail</span>
+            <input name="email" type="email" placeholder="voce@email.com" required />
+          </label>
+          <label class="field">
+            <span class="field-label">Senha</span>
+            <input name="password" type="password" minlength="6" placeholder="Mínimo 6 caracteres" required />
+          </label>
+          <label class="field">
+            <span class="field-label">Código de convite</span>
+            <input name="inviteCode" required placeholder="Ex: BOT2026" autocomplete="off" />
+            <small>Conta liberada apenas com convite válido.</small>
           </label>
           <button type="submit" class="btn btn-primary btn-block btn-glow">Criar conta</button>
         </form>
-        <p style="margin-top:20px;text-align:center;font-size:0.85rem;color:var(--muted)">
-          Ja tem conta? <a href="/login" style="color:#0a5cff;font-weight:600">Entrar</a>
+        <p class="auth-footer">
+          Já tem conta? <a href="/login">Entrar</a>
         </p>
       </div>
     </section>
@@ -427,9 +440,21 @@ export function settingsPage(
     provider: AIProviderId;
     providerLabel: string;
   },
+  bots: BotConfig[] = [],
+  previewBotId = "",
   partial = false,
   userName = "Usuario"
 ) {
+  const previewBot = bots.find((b) => b.id === previewBotId) ?? bots[0];
+  const previewBotOptions =
+    bots.length === 0
+      ? `<option value="">Crie uma instância primeiro</option>`
+      : bots
+          .map(
+            (b) =>
+              `<option value="${b.id}" ${b.id === previewBot?.id ? "selected" : ""}>${escapeHtml(b.name)}</option>`
+          )
+          .join("");
   const statusClass = input.configured ? "badge-online" : "badge-paused";
   const statusText = input.configured ? `Conectado · ${escapeHtml(input.providerLabel)}` : "Não configurado";
   const providerOptions = Object.entries(AI_PROVIDERS)
@@ -475,6 +500,33 @@ export function settingsPage(
           <p style="margin-bottom:12px">API Key criptografada no PostgreSQL após salvar.</p>
           <p>Use <code style="background:#0a0c12;padding:2px 6px;border-radius:4px">DATABASE_PUBLIC_URL</code> ou <code style="background:#0a0c12;padding:2px 6px;border-radius:4px">DATABASE_URL</code> para persistir dados.</p>
         </div>
+      </div>
+    </div>
+
+    <div class="card card-premium" style="margin-top:18px" id="previa">
+      <div class="card-head">
+        <h3>${icons.image} Prévia gratuita (amostra)</h3>
+        <span class="badge badge-online">Por instância</span>
+      </div>
+      <div class="card-body">
+        <p class="form-hint" style="margin-bottom:14px">
+          Configure as mídias que o bot manda de graça quando o lead pede amostra. Também disponível em
+          <a href="/instances" style="color:var(--primary)">Instâncias → Editar</a>.
+        </p>
+        <form method="get" action="/settings" class="inline-form" style="margin-bottom:16px">
+          <label class="field">Instância
+            <select name="botId" onchange="this.form.submit()">${previewBotOptions}</select>
+          </label>
+        </form>
+        ${
+          previewBot
+            ? `<form id="settings-preview-form" method="post" action="/settings/previews" enctype="multipart/form-data">
+            <input type="hidden" name="botId" value="${previewBot.id}" />
+            ${previewConfigBlock(previewBot, "settings-preview-form")}
+            <button type="submit" class="btn btn-primary" style="margin-top:12px">Salvar prévias</button>
+          </form>`
+            : `<p class="form-hint"><a href="/instances/new">Criar instância</a> para cadastrar prévias.</p>`
+        }
       </div>
     </div>`;
 
