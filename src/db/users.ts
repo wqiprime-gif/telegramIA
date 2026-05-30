@@ -110,18 +110,30 @@ export async function createUser(input: { email: string; password: string; name:
   const passwordHash = hashPassword(input.password);
 
   if (useDatabase()) {
-    const { rows } = await getPool().query<UserRow>(
-      `INSERT INTO panel_users (email, password_hash, name)
-       VALUES ($1,$2,$3)
-       RETURNING id, email, password_hash, name, created_at`,
-      [email, passwordHash, input.name.trim()]
-    );
-    const user = rowToUser(rows[0]);
-    await getPool().query(
-      `INSERT INTO user_settings (user_id, openai_model) VALUES ($1, $2) ON CONFLICT (user_id) DO NOTHING`,
-      [user.id, env.OPENAI_MODEL]
-    );
-    return user;
+    const existing = await findUserByEmail(email);
+    if (existing) {
+      throw new Error("Este e-mail já está cadastrado. Use Entrar para acessar sua conta.");
+    }
+    try {
+      const { rows } = await getPool().query<UserRow>(
+        `INSERT INTO panel_users (email, password_hash, name)
+         VALUES ($1,$2,$3)
+         RETURNING id, email, password_hash, name, created_at`,
+        [email, passwordHash, input.name.trim()]
+      );
+      const user = rowToUser(rows[0]);
+      await getPool().query(
+        `INSERT INTO user_settings (user_id, openai_model) VALUES ($1, $2) ON CONFLICT (user_id) DO NOTHING`,
+        [user.id, env.OPENAI_MODEL]
+      );
+      return user;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (/panel_users_email_key|duplicate key.*email/i.test(msg)) {
+        throw new Error("Este e-mail já está cadastrado. Use Entrar para acessar sua conta.");
+      }
+      throw error;
+    }
   }
 
   const users = await loadFileUsers();

@@ -156,7 +156,7 @@ export function loginPage(message = "") {
     </section>
     <section class="login-card-wrap">
       <div class="login-card-glow" aria-hidden="true"></div>
-      <div class="login-card-premium">
+      <div class="login-card-premium login-card-auth">
         <h2>Entrar</h2>
         <p class="sub">Acesse seu painel BotManager</p>
         ${message ? alertHtml(message, "error") : ""}
@@ -392,7 +392,7 @@ export function registerPage(message = "") {
     </section>
     <section class="login-card-wrap">
       <div class="login-card-glow" aria-hidden="true"></div>
-      <div class="login-card-premium">
+      <div class="login-card-premium login-card-auth">
         <h2>Criar conta</h2>
         <p class="sub">Comece em menos de 1 minuto</p>
         ${message ? alertHtml(message, "error") : ""}

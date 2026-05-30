@@ -1,7 +1,7 @@
 {
   "name": "bot-telegram-ia",
   "private": true,
-  "version": "0.8.5",
+  "version": "0.8.6",
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",

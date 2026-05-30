@@ -57,7 +57,7 @@ export const premiumStyles = `
 }
 .mesh-blob--app { opacity: 0.7; }
 
-.auth-body { overflow: hidden; background: #030508; }
+.auth-body { overflow-x: hidden; overflow-y: auto; min-height: 100vh; background: #030508; }
 .auth-body .ambient { display: none; }
 
 /* —— LOGIN —— */
@@ -68,13 +68,26 @@ export const premiumStyles = `
   grid-template-columns: 1.15fr 0.85fr;
   align-items: center;
   gap: 56px;
-  padding: 56px 64px;
+  padding: 48px 64px;
   max-width: 1400px;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 @media (max-width: 1000px) {
-  .login-premium { grid-template-columns: 1fr; padding: 32px 24px; }
+  .login-premium {
+    grid-template-columns: 1fr;
+    padding: 28px 20px 40px;
+    align-items: start;
+    justify-items: center;
+    min-height: auto;
+  }
   .login-showcase { display: none; }
+  .login-card-wrap {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    align-self: start;
+  }
 }
 
 .login-showcase .brand-mark { margin-bottom: 8px; }
@@ -221,10 +234,10 @@ export const premiumStyles = `
   box-shadow: 0 0 12px var(--blue-glow);
 }
 
-.login-card-wrap { position: relative; display: flex; justify-content: center; align-items: flex-start; }
+.login-card-wrap { position: relative; display: flex; justify-content: center; align-items: center; width: 100%; }
 .login-card-glow {
   position: absolute;
-  width: min(420px, 92vw); height: 480px;
+  width: min(420px, 92vw); height: min(480px, 90vh);
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   border-radius: 28px;
@@ -232,6 +245,7 @@ export const premiumStyles = `
   filter: blur(56px);
   opacity: 0.42;
   animation: glow-spin 14s linear infinite;
+  pointer-events: none;
 }
 @keyframes glow-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
 
@@ -308,6 +322,17 @@ export const premiumStyles = `
   border-color: rgba(10, 92, 255, 0.75) !important;
   box-shadow: 0 0 0 3px rgba(10, 92, 255, 0.25), 0 0 24px rgba(10, 92, 255, 0.15) !important;
   outline: none !important;
+}
+.auth-body .login-card-premium label.field input:-webkit-autofill,
+.auth-body .login-card-premium label.field input:-webkit-autofill:hover,
+.auth-body .login-card-premium label.field input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.45) inset !important;
+  -webkit-text-fill-color: #f1f5f9 !important;
+  caret-color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+.auth-body .login-card-premium .auth-form .field {
+  margin-bottom: 12px !important;
 }
 .auth-body .login-card-premium label.field small {
   display: block;
